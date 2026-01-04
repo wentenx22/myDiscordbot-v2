@@ -322,6 +322,279 @@ class DatabaseManager {
     }
   }
 
+  // ========================================================
+  // 【新增SQL查询函数】架构改造第一阶段
+  // 用于替换 statistics.loadOrdersData() 等旧函数
+  // ========================================================
+
+  /**
+   * 获取订单统计摘要（从SQLite直接聚合）
+   * 返回：总订单数、总收入、总时长等统计数据
+   */
+  getStatsSummary() {
+    try {
+      // 报备和派单分别统计
+      const reportsStmt = this.db.prepare(`
+        SELECT 
+          COUNT(*) as count,
+          COALESCE(SUM(CAST(amount AS INTEGER)), 0) as totalAmount,
+          GROUP_CONCAT(duration, ',') as durations
+        FROM orders WHERE type = 'report'
+      `);
+      reportsStmt.step();
+      const reportStats = reportsStmt.getAsObject();
+      reportsStmt.free();
+
+      const dispatchesStmt = this.db.prepare(`
+        SELECT 
+          COUNT(*) as count,
+          COALESCE(SUM(CAST(price AS INTEGER)), 0) as totalPrice,
+          GROUP_CONCAT(duration, ',') as durations
+        FROM orders WHERE type != 'report'
+      `);
+      dispatchesStmt.step();
+      const dispatchStats = dispatchesStmt.getAsObject();
+      dispatchesStmt.free();
+
+      // 计算总时长（提取数字部分）
+      const parseDuration = (durationStr) => {
+        if (!durationStr) return 0;
+        const match = String(durationStr).match(/(\d+)/);
+        return match ? parseInt(match[1]) : 0;
+      };
+
+      const reportDurations = reportStats.durations ? reportStats.durations.split(',').map(parseDuration) : [];
+      const dispatchDurations = dispatchStats.durations ? dispatchStats.durations.split(',').map(parseDuration) : [];
+      const totalReportHours = reportDurations.reduce((a, b) => a + b, 0);
+      const totalDispatchHours = dispatchDurations.reduce((a, b) => a + b, 0);
+
+      // 检查缺失单号的记录
+      const missingOrderNoStmt = this.db.prepare(`
+        SELECT 
+          SUM(CASE WHEN type = 'report' AND (orderNo IS NULL OR orderNo = '') THEN 1 ELSE 0 END) as reportsMissing,
+          SUM(CASE WHEN type != 'report' AND (orderNo IS NULL OR orderNo = '') THEN 1 ELSE 0 END) as dispatchesMissing
+        FROM orders
+      `);
+      missingOrderNoStmt.step();
+      const missingStats = missingOrderNoStmt.getAsObject();
+      missingOrderNoStmt.free();
+
+      return {
+        totalReports: parseInt(reportStats.count) || 0,
+        totalDispatches: parseInt(dispatchStats.count) || 0,
+        reportsTotalAmount: parseInt(reportStats.totalAmount) || 0,
+        dispatchesTotalPrice: parseInt(dispatchStats.totalPrice) || 0,
+        totalAmount: (parseInt(reportStats.totalAmount) || 0) + (parseInt(dispatchStats.totalPrice) || 0),
+        reportsTotalHours: totalReportHours,
+        dispatchesTotalHours: totalDispatchHours,
+        totalHours: totalReportHours + totalDispatchHours,
+        reportsMissingOrderNo: parseInt(missingStats.reportsMissing) || 0,
+        dispatchesMissingOrderNo: parseInt(missingStats.dispatchesMissing) || 0,
+        totalMissingOrderNo: (parseInt(missingStats.reportsMissing) || 0) + (parseInt(missingStats.dispatchesMissing) || 0)
+      };
+    } catch (err) {
+      console.error('❌ 获取统计摘要失败:', err);
+      return {
+        totalReports: 0, totalDispatches: 0, reportsTotalAmount: 0, dispatchesTotalPrice: 0,
+        totalAmount: 0, reportsTotalHours: 0, dispatchesTotalHours: 0, totalHours: 0,
+        reportsMissingOrderNo: 0, dispatchesMissingOrderNo: 0, totalMissingOrderNo: 0
+      };
+    }
+  }
+
+  /**
+   * 数据质量检查（从SQLite）
+   * 返回：问题列表、警告列表等
+   */
+  performDataQualityCheck() {
+    try {
+      const orders = this.getAllOrders();
+      const issues = [];
+      const warnings = [];
+
+      // 检查数据一致性问题
+      const reportsWithoutOrderNo = orders.filter(o => o.type === 'report' && !o.orderNo).length;
+      const dispatchesWithoutOrderNo = orders.filter(o => o.type !== 'report' && !o.orderNo).length;
+
+      if (reportsWithoutOrderNo > 0) {
+        warnings.push(`⚠️ 有 ${reportsWithoutOrderNo} 条报备未填写单号`);
+      }
+      if (dispatchesWithoutOrderNo > 0) {
+        warnings.push(`⚠️ 有 ${dispatchesWithoutOrderNo} 条派单未填写单号`);
+      }
+
+      // 检查重复的单号
+      const orderNos = {};
+      orders.forEach(o => {
+        if (o.orderNo) {
+          if (!orderNos[o.orderNo]) orderNos[o.orderNo] = 0;
+          orderNos[o.orderNo]++;
+        }
+      });
+      
+      const duplicateOrderNos = Object.entries(orderNos)
+        .filter(([, count]) => count > 1)
+        .map(([no, count]) => `❌ 单号 ${no} 重复 ${count} 次`);
+      
+      issues.push(...duplicateOrderNos);
+
+      // 检查缺失重要字段
+      const ordersWithoutPlayer = orders.filter(o => o.type !== 'report' && !o.player).length;
+      const ordersWithoutBoss = orders.filter(o => !o.boss).length;
+
+      if (ordersWithoutPlayer > 0) {
+        warnings.push(`⚠️ 有 ${ordersWithoutPlayer} 条派单缺少陪玩员信息`);
+      }
+      if (ordersWithoutBoss > 0) {
+        warnings.push(`⚠️ 有 ${ordersWithoutBoss} 条记录缺少老板信息`);
+      }
+
+      return {
+        hasIssues: issues.length > 0,
+        issues,
+        warnings,
+        totalIssuesAndWarnings: issues.length + warnings.length
+      };
+    } catch (err) {
+      console.error('❌ 数据质量检查失败:', err);
+      return { hasIssues: false, issues: [], warnings: [], totalIssuesAndWarnings: 0 };
+    }
+  }
+
+  /**
+   * 获取派单员排行（从SQLite GROUP BY）
+   * 返回：派单员名称、派单数、总金额等
+   */
+  getAssignerRankingFromDB() {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT 
+          assigner,
+          COUNT(*) as count,
+          COALESCE(SUM(CAST(price AS INTEGER)), 0) as totalPrice
+        FROM orders
+        WHERE type != 'report' AND assigner IS NOT NULL AND assigner != ''
+        GROUP BY assigner
+        ORDER BY totalPrice DESC
+        LIMIT 10
+      `);
+
+      const results = [];
+      while (stmt.step()) {
+        const row = stmt.getAsObject();
+        results.push({
+          name: row.assigner,
+          count: parseInt(row.count) || 0,
+          totalPrice: parseInt(row.totalPrice) || 0
+        });
+      }
+      stmt.free();
+      return results;
+    } catch (err) {
+      console.error('❌ 获取派单员排行失败:', err);
+      return [];
+    }
+  }
+
+  /**
+   * 获取陪玩员排行（从SQLite GROUP BY）
+   */
+  getPlayerRankingFromDB() {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT 
+          player,
+          COUNT(*) as count,
+          COALESCE(SUM(CAST(price AS INTEGER)), 0) as total
+        FROM orders
+        WHERE type != 'report' AND player IS NOT NULL AND player != ''
+        GROUP BY player
+        ORDER BY total DESC
+        LIMIT 10
+      `);
+
+      const results = [];
+      while (stmt.step()) {
+        const row = stmt.getAsObject();
+        results.push({
+          name: row.player,
+          count: parseInt(row.count) || 0,
+          total: parseInt(row.total) || 0
+        });
+      }
+      stmt.free();
+      return results;
+    } catch (err) {
+      console.error('❌ 获取陪玩员排行失败:', err);
+      return [];
+    }
+  }
+
+  /**
+   * 获取老板排行（从SQLite GROUP BY）
+   */
+  getBossRankingFromDB() {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT 
+          boss,
+          COUNT(*) as count,
+          COALESCE(SUM(CAST(amount AS INTEGER)) + SUM(CAST(price AS INTEGER)), 0) as totalAmount
+        FROM orders
+        WHERE boss IS NOT NULL AND boss != ''
+        GROUP BY boss
+        ORDER BY totalAmount DESC
+        LIMIT 10
+      `);
+
+      const results = [];
+      while (stmt.step()) {
+        const row = stmt.getAsObject();
+        results.push({
+          name: row.boss,
+          count: parseInt(row.count) || 0,
+          totalAmount: parseInt(row.totalAmount) || 0
+        });
+      }
+      stmt.free();
+      return results;
+    } catch (err) {
+      console.error('❌ 获取老板排行失败:', err);
+      return [];
+    }
+  }
+
+  /**
+   * 获取指定日期范围内的订单（从SQLite WHERE查询）
+   * @param {string} startDate - 开始日期 (YYYY-MM-DD)
+   * @param {string} endDate - 结束日期 (YYYY-MM-DD)
+   * @returns {Array} 筛选后的订单
+   */
+  getOrdersByDateRange(startDate, endDate) {
+    try {
+      // 构建日期范围查询：确保包含endDate当天的全部记录
+      const startDateTime = startDate + ' 00:00:00';
+      const endDateTime = endDate + ' 23:59:59';
+
+      const stmt = this.db.prepare(`
+        SELECT * FROM orders
+        WHERE date >= ? AND date <= ?
+        ORDER BY id DESC
+      `);
+      stmt.bind([startDateTime, endDateTime]);
+
+      const results = [];
+      while (stmt.step()) {
+        results.push(stmt.getAsObject());
+      }
+      stmt.free();
+      return results;
+    } catch (err) {
+      console.error('❌ 按日期范围查询订单失败:', err);
+      return [];
+    }
+  }
+
   // 关闭数据库连接
   close() {
     try {

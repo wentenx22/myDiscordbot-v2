@@ -231,7 +231,8 @@ async function buildDbPanelEmbed() {
   try {
     await ensureDbInitialized();
     const stats = await db.getStats();
-    const allOrders = await cacheManager.getOrders(); // 【修复问题 6】使用缓存
+    // 【架构改造】使用db.getAllOrders()替代cacheManager.getOrders()
+    const allOrders = db.getAllOrders();
 
     const embed = new EmbedBuilder()
       .setColor(0xff99cc)
@@ -1387,9 +1388,9 @@ client.on("interactionCreate", async (interaction) => {
       interaction.commandName === "datacenter"
     ) {
       try {
-        const allOrders = statistics.loadOrdersData();
-        const summary = statistics.calculateSummary(allOrders);
-        const qualityCheck = statistics.performDataQualityCheck(allOrders);
+        // 【架构改造】使用SQLite直接查询而非statistics.loadOrdersData()
+        const summary = db.getStatsSummary();
+        const qualityCheck = db.performDataQualityCheck();
 
         const embed = new EmbedBuilder()
           .setColor(THEME_COLOR)
@@ -1466,11 +1467,10 @@ client.on("interactionCreate", async (interaction) => {
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "datacenter_ranking") {
       try {
-        const allOrders = statistics.loadOrdersData();
-
-        const assigners = statistics.getAssignerRanking(allOrders);
-        const players = statistics.getPlayerRanking(allOrders);
-        const bosses = statistics.getBossRanking(allOrders);
+        // 【架构改造】使用SQLite GROUP BY查询而非statistics计算
+        const assigners = db.getAssignerRankingFromDB();
+        const players = db.getPlayerRankingFromDB();
+        const bosses = db.getBossRankingFromDB();
 
         const assignersText = assigners
           .map((a, i) => `${i + 1}. ${a.name}: RM ${a.totalPrice} (${a.count}单)`)
@@ -1525,8 +1525,8 @@ client.on("interactionCreate", async (interaction) => {
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "datacenter_quality_check") {
       try {
-        const allOrders = statistics.loadOrdersData();
-        const check = statistics.performDataQualityCheck(allOrders);
+        // 【架构改造】使用SQLite质量检查而非statistics计算
+        const check = db.performDataQualityCheck();
 
         let description = '';
         if (check.issues.length > 0) {
@@ -1572,9 +1572,9 @@ client.on("interactionCreate", async (interaction) => {
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "datacenter_refresh") {
       try {
-        const allOrders = statistics.loadOrdersData();
-        const summary = statistics.calculateSummary(allOrders);
-        const qualityCheck = statistics.performDataQualityCheck(allOrders);
+        // 【架构改造】使用SQLite直接查询而非statistics.loadOrdersData()
+        const summary = db.getStatsSummary();
+        const qualityCheck = db.performDataQualityCheck();
 
         const embed = new EmbedBuilder()
           .setColor(THEME_COLOR)
@@ -1766,13 +1766,12 @@ client.on("interactionCreate", async (interaction) => {
 
         let filteredOrders;
 
-        const allOrders = statistics.loadOrdersData();
-
+        // 【架构改造】使用SQLite WHERE查询而非JS数组filter
         if (value === "all") {
-          filteredOrders = allOrders;
+          filteredOrders = db.getAllOrders();
         } else {
           const [startStr, endStr] = value.split("_");
-          filteredOrders = statistics.filterByDateRange(allOrders, startStr, endStr);
+          filteredOrders = db.getOrdersByDateRange(startStr, endStr);
         }
 
         if (filteredOrders.length === 0) {
@@ -1781,7 +1780,7 @@ client.on("interactionCreate", async (interaction) => {
           });
         }
 
-        // 根据筛选数据计算统计
+        // 根据筛选数据计算统计（使用statistics格式化）
         const summary = statistics.calculateSummary(filteredOrders);
         const assigners = statistics.getAssignerRanking(filteredOrders);
         const players = statistics.getPlayerRanking(filteredOrders);
@@ -1828,9 +1827,7 @@ client.on("interactionCreate", async (interaction) => {
             .setStyle(ButtonStyle.Secondary)
         );
 
-        // 将筛选结果缓存到全局，供后续导出使用
-        global.filteredOrdersCache = filteredOrders;
-        global.filteredOrdersCacheTime = Date.now();
+        // 【架构改造】不再使用global.filteredOrdersCache缓存，改为SQLite实时查询
 
         await interaction.editReply({
           embeds: [embed],
@@ -1893,11 +1890,9 @@ client.on("interactionCreate", async (interaction) => {
 
         console.log("[自定义时间筛选] 日期格式验证通过");
 
-        const allOrders = statistics.loadOrdersData();
-        console.log(`[自定义时间筛选] 加载了 ${allOrders.length} 条订单`);
-
-        const filteredOrders = statistics.filterByDateRange(allOrders, startDateTime, endDateTime);
-        console.log(`[自定义时间筛选] 筛选后得到 ${filteredOrders.length} 条订单`);
+        // 【架构改造】使用SQLite WHERE查询而非JS数组filter
+        const filteredOrders = db.getOrdersByDateRange(startDateTime.split(' ')[0], endDateTime.split(' ')[0]);
+        console.log(`[自定义时间筛选] 从SQLite查询得到 ${filteredOrders.length} 条订单`);
 
         await interaction.deferReply({ ephemeral: true });
 
@@ -1953,9 +1948,7 @@ client.on("interactionCreate", async (interaction) => {
             .setStyle(ButtonStyle.Secondary)
         );
 
-        // 将筛选结果缓存到全局，供后续导出使用
-        global.filteredOrdersCache = filteredOrders;
-        global.filteredOrdersCacheTime = Date.now();
+        // 【架构改造】不再使用global.filteredOrdersCache缓存，改为SQLite实时查询
 
         console.log("[自定义时间筛选] 准备发送回复");
 
