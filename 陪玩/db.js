@@ -56,19 +56,25 @@ class DatabaseManager {
   // 创建所有必要的表
   async createTables() {
     try {
-      // 订单表
+      // 订单表 - 支持报备和派单的统一字段
       this.db.run(`
         CREATE TABLE IF NOT EXISTS orders (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
-          type TEXT NOT NULL,
+          type TEXT NOT NULL DEFAULT 'report',
           boss TEXT,
           player TEXT,
+          assigner TEXT,
           orderType TEXT,
+          game TEXT,
           duration TEXT,
           amount INTEGER,
+          price INTEGER,
           date TEXT,
           source TEXT,
           orderNo TEXT,
+          customer TEXT,
+          source_channel TEXT,
+          originalOrder TEXT,
           createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
         )
       `);
@@ -103,22 +109,32 @@ class DatabaseManager {
   // 添加订单
   addOrder(orderData) {
     try {
-      const { type, boss, player, orderType, duration, amount, date, source, orderNo } = orderData;
+      const { type, boss, player, orderType, duration, amount, date, source, orderNo, assigner, game, price, customer, source_channel, originalOrder } = orderData;
       const stmt = this.db.prepare(
-        `INSERT INTO orders (type, boss, player, orderType, duration, amount, date, source, orderNo)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO orders (type, boss, player, assigner, orderType, game, duration, amount, price, date, source, orderNo, customer, source_channel, originalOrder)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       );
-      stmt.bind([
-        type || 'report',  // type 不能为空
-        boss || null,
-        player || null,
-        orderType || null,
-        duration || null,
-        amount || null,
-        date || null,
-        source || null,
-        orderNo || null
-      ]);
+      
+      // sql.js不接受undefined，需要用null或空字符串替换
+      const values = [
+        type || 'report',
+        boss ? String(boss) : '',
+        player ? String(player) : '',
+        assigner ? String(assigner) : '',
+        orderType ? String(orderType) : '',
+        game ? String(game) : '',
+        duration ? String(duration) : '',
+        amount !== undefined && amount !== null ? Number(amount) : 0,
+        price !== undefined && price !== null ? Number(price) : 0,
+        date ? String(date) : new Date().toISOString(),
+        source ? String(source) : '',
+        orderNo ? String(orderNo) : '',
+        customer ? String(customer) : '',
+        source_channel ? String(source_channel) : '',
+        originalOrder ? String(originalOrder) : ''
+      ];
+      
+      stmt.bind(values);
       stmt.step();
       stmt.free();
       
@@ -152,6 +168,23 @@ class DatabaseManager {
     try {
       const stmt = this.db.prepare('SELECT * FROM orders WHERE id = ?');
       stmt.bind([id]);
+      let result = null;
+      if (stmt.step()) {
+        result = stmt.getAsObject();
+      }
+      stmt.free();
+      return result;
+    } catch (err) {
+      console.error('❌ 获取订单失败:', err);
+      throw err;
+    }
+  }
+
+  // 获取指定订单号的订单
+  getOrderByNo(orderNo) {
+    try {
+      const stmt = this.db.prepare('SELECT * FROM orders WHERE orderNo = ?');
+      stmt.bind([orderNo]);
       let result = null;
       if (stmt.step()) {
         result = stmt.getAsObject();
