@@ -268,7 +268,7 @@ async function buildDbPanelEmbed() {
 
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId("db_export_excel")
+      .setCustomId("export_excel")
       .setLabel("📥 导出 Excel")
       .setStyle(ButtonStyle.Success)
       .setEmoji("📥"),
@@ -1413,7 +1413,7 @@ client.on("interactionCreate", async (interaction) => {
 
         const row1 = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
-            .setCustomId("datacenter_export_excel")
+            .setCustomId("export_excel")
             .setLabel("📥 导出 Excel")
             .setStyle(ButtonStyle.Success),
           new ButtonBuilder()
@@ -1432,7 +1432,7 @@ client.on("interactionCreate", async (interaction) => {
             .setLabel("📅 时间筛选")
             .setStyle(ButtonStyle.Primary),
           new ButtonBuilder()
-            .setCustomId("datacenter_export_telegram")
+            .setCustomId("export_excel")
             .setLabel("✈️ 发送到飞机")
             .setStyle(ButtonStyle.Danger),
           new ButtonBuilder()
@@ -1457,64 +1457,9 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // ---------------------------------------------------------
-    // 数据管理中心 - 导出 CSV (从SQLite)
+    // 数据管理中心 - 导出 CSV - 已改为 export_excel
     // ---------------------------------------------------------
-    if (interaction.isButton() && interaction.customId === "datacenter_export_excel") {
-      try {
-        await interaction.deferReply({ ephemeral: true });
-
-        // 【修复】清除缓存，确保读取最新数据
-        cacheManager.invalidate();
-
-        // 检查数据库中是否有数据
-        const allOrders = db.getAllOrders();
-        if (allOrders.length === 0) {
-          return await interaction.editReply({
-            content: "📊 SQLite数据库中暂无数据可导出～",
-          });
-        }
-
-        // 使用SQLite CLI导出CSV
-        const fileName = `订单数据_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.csv`;
-        const filePath = sqliteExporter.exportToCSV(fileName);
-        
-        if (!filePath) {
-          return await interaction.editReply({
-            content: "❌ CSV导出失败",
-          });
-        }
-
-        const attachment = new AttachmentBuilder(filePath, { name: fileName });
-        
-        // 统计报备和派单记录数
-        const reports = allOrders.filter(o => o.type === 'report');
-        const dispatches = allOrders.filter(o => o.type !== 'report' && o.type);
-
-        await interaction.editReply({
-          content: `✅ 已导出 ${reports.length} 条报备记录 + ${dispatches.length} 条派单记录\n📊 总计: ${allOrders.length} 条\n💾 CSV文件已生成，请下载`,
-          files: [attachment],
-        });
-
-        // 同时发送到存档频道
-        setTimeout(() => {
-          sendCsvToArchive(filePath, fileName, allOrders.length, '数据管理中心导出');
-        }, 100);
-
-        // 异步导出到Google Sheets
-        setTimeout(() => {
-          exportToGoogleSheets(allOrders, '数据管理中心导出');
-        }, 200);
-
-        // 5秒后删除临时文件
-        sqliteExporter.deleteFileAsync(filePath, 5000);
-      } catch (err) {
-        console.error("❌ CSV导出错误:", err);
-        await interaction.editReply({
-          content: `❌ 导出失败: ${err.message}`,
-        });
-      }
-      return;
-    }
+    // 【已弃用】此处理器已移除，导出改为使用 export_excel
 
     // ---------------------------------------------------------
     // 数据管理中心 - 查看排行
@@ -1617,77 +1562,10 @@ client.on("interactionCreate", async (interaction) => {
     // ---------------------------------------------------------
     // 数据管理中心 - 导出到 Telegram
     // ---------------------------------------------------------
-    if (interaction.isButton() && interaction.customId === "datacenter_export_telegram") {
-      try {
-        await interaction.deferReply({ ephemeral: true });
-
-        // 【修复】清除缓存，确保读取最新数据
-        cacheManager.invalidate();
-
-        // 【修改】从SQLite数据库读取数据
-        const allOrders = db.getAllOrders();
-        if (allOrders.length === 0) {
-          return await interaction.editReply({
-            content: "📊 SQLite数据库中暂无数据可导出～",
-          });
-        }
-
-        // 导出CSV文件
-        const fileName = `单子统计_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.csv`;
-        const filePath = sqliteExporter.exportToCSV(fileName);
-
-        // 读取CSV内容作为消息体发送到Telegram
-        const fs = require('fs');
-        const csvContent = fs.readFileSync(filePath, 'utf8');
-        const reportCount = allOrders.filter(o => o.type === 'report').length;
-        const dispatchCount = allOrders.filter(o => o.type !== 'report').length;
-        
-        const telegramConfig = {
-          token: config.telegramToken,
-          chatId: config.telegramChatId,
-          messageThreadId: config.telegramMessageThreadId,
-        };
-
-        // 发送CSV到Telegram（通过FormData发送文件）
-        const FormData = require('form-data');
-        const axios = require('axios');
-        
-        const form = new FormData();
-        form.append('chat_id', telegramConfig.chatId);
-        if (telegramConfig.messageThreadId) {
-          form.append('message_thread_id', telegramConfig.messageThreadId);
-        }
-        form.append('document', fs.createReadStream(filePath), fileName);
-        form.append('caption', `📊 <b>数据管理中心导出</b>\n⏰ ${new Date().toLocaleString("zh-CN")}\n\n✅ 已导出 ${reportCount} 条报备 + ${dispatchCount} 条派单\n💾 CSV格式`);
-        form.append('parse_mode', 'HTML');
-
-        await axios.post(`https://api.telegram.org/bot${telegramConfig.token}/sendDocument`, form, {
-          headers: form.getHeaders()
-        });
-
-        await interaction.editReply({
-          content: "✅ CSV文件已导出至 Telegram～",
-        });
-        
-        // 同时发送到存档频道
-        setTimeout(() => {
-          sendCsvToArchive(filePath, fileName, allOrders.length, '数据管理中心Telegram导出');
-        }, 100);
-        
-        // 异步导出到Google Sheets
-        setTimeout(() => {
-          exportToGoogleSheets(allOrders, '数据管理中心Telegram导出');
-        }, 200);
-        
-        sqliteExporter.deleteFileAsync(filePath, 5000);
-      } catch (err) {
-        console.error("导出Telegram错误:", err);
-        await interaction.editReply({
-          content: `❌ 导出失败: ${err.message}`,
-        });
-      }
-      return;
-    }
+    // ---------------------------------------------------------
+    // 数据管理中心 - 导出到 Telegram - 已改为 export_excel
+    // ---------------------------------------------------------
+    // 【已弃用】此处理器已移除，导出改为使用 export_excel
 
     // ---------------------------------------------------------
     // 数据管理中心 - 刷新
@@ -1720,7 +1598,7 @@ client.on("interactionCreate", async (interaction) => {
 
         const row1 = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
-            .setCustomId("datacenter_export_excel")
+            .setCustomId("export_excel")
             .setLabel("📥 导出 Excel")
             .setStyle(ButtonStyle.Success),
           new ButtonBuilder()
@@ -1739,7 +1617,7 @@ client.on("interactionCreate", async (interaction) => {
             .setLabel("📅 时间筛选")
             .setStyle(ButtonStyle.Primary),
           new ButtonBuilder()
-            .setCustomId("datacenter_export_telegram")
+            .setCustomId("export_excel")
             .setLabel("✈️ 发送到飞机")
             .setStyle(ButtonStyle.Danger),
           new ButtonBuilder()
@@ -1941,7 +1819,7 @@ client.on("interactionCreate", async (interaction) => {
         // 导出按钮
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
-            .setCustomId("time_filter_export_excel")
+            .setCustomId("export_excel")
             .setLabel("📥 导出 Excel")
             .setStyle(ButtonStyle.Success),
           new ButtonBuilder()
@@ -2066,7 +1944,7 @@ client.on("interactionCreate", async (interaction) => {
         // 导出按钮
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
-            .setCustomId("time_filter_export_excel")
+            .setCustomId("export_excel")
             .setLabel("📥 导出 Excel")
             .setStyle(ButtonStyle.Success),
           new ButtonBuilder()
@@ -2135,7 +2013,7 @@ client.on("interactionCreate", async (interaction) => {
           .setLabel("📊 导出 Excel")
           .setStyle(ButtonStyle.Danger),
         new ButtonBuilder()
-          .setCustomId("export_telegram")
+          .setCustomId("export_excel")
           .setLabel("✈️ 导出到飞机")
           .setStyle(ButtonStyle.Danger)
       );
@@ -2258,86 +2136,9 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // ---------------------------------------------------------
-    // 导出到 Telegram（飞机）按钮
+    // 导出到 Telegram（飞机）按钮 - 已改为 export_excel
     // ---------------------------------------------------------
-    if (interaction.isButton() && interaction.customId === "export_telegram") {
-      try {
-        await interaction.deferReply({ ephemeral: true });
-
-        // 【修复】清除缓存，确保读取最新数据
-        cacheManager.invalidate();
-
-        // 【修改】从SQLite数据库读取数据
-        const allOrders = db.getAllOrders();
-        if (allOrders.length === 0) {
-          return interaction.editReply({
-            content: "📊 SQLite数据库中暂无数据可导出～",
-          });
-        }
-
-        // 导出CSV文件
-        const fileName = `单子统计_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.csv`;
-        const filePath = sqliteExporter.exportToCSV(fileName);
-
-        // 发送CSV到Telegram
-        try {
-          const fs = require('fs');
-          const FormData = require('form-data');
-          const axios = require('axios');
-          
-          const telegramConfig = {
-            token: config.telegramToken,
-            chatId: config.telegramChatId,
-            messageThreadId: config.telegramMessageThreadId,
-          };
-          
-          const form = new FormData();
-          form.append('chat_id', telegramConfig.chatId);
-          if (telegramConfig.messageThreadId) {
-            form.append('message_thread_id', telegramConfig.messageThreadId);
-          }
-          form.append('document', fs.createReadStream(filePath), fileName);
-          
-          const reportCount = allOrders.filter(o => o.type === 'report').length;
-          const dispatchCount = allOrders.filter(o => o.type !== 'report').length;
-          
-          form.append('caption', `📊 <b>单子统计数据</b>\n⏰ ${new Date().toLocaleString("zh-CN")}\n✅ 已导出 ${reportCount} 条报备 + ${dispatchCount} 条派单\n💾 CSV格式`);
-          form.append('parse_mode', 'HTML');
-
-          await axios.post(`https://api.telegram.org/bot${telegramConfig.token}/sendDocument`, form, {
-            headers: form.getHeaders()
-          });
-          
-          await interaction.editReply({
-            content: "✅ CSV 文件（报备+派单）已导出至 Telegram～",
-          });
-          
-          // 同时发送到存档频道
-          setTimeout(() => {
-            sendCsvToArchive(filePath, fileName, allOrders.length, '单子查询中心Telegram导出');
-          }, 100);
-          
-          // 异步导出到Google Sheets
-          setTimeout(() => {
-            exportToGoogleSheets(allOrders, '单子查询中心Telegram导出');
-          }, 200);
-          
-          sqliteExporter.deleteFileAsync(filePath, 5000);
-        } catch (err) {
-          console.error("❌ 导出到 Telegram 错误:", err.message);
-          await interaction.editReply({
-            content: "❌ 导出到 Telegram 时出错，请稍后重试～",
-          });
-        }
-
-      } catch (err) {
-        console.error("导出到 Telegram 错误:", err);
-        interaction.editReply({
-          content: "❌ 导出到 Telegram 时出错，请稍后重试～",
-        });
-      }
-      return;
-    }
+    // 【已弃用】此处理器已移除，所有导出均使用 export_excel
 
     // ---------------------------------------------------------
     // 查看报备记录按钮
@@ -3358,62 +3159,9 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     // ---------------------------------------------------------
     // /db 按钮处理器 - db_export_excel (现在导出CSV从SQLite)
     // ---------------------------------------------------------
-    if (interaction.isButton() && interaction.customId === "db_export_excel") {
-      try {
-        console.log("[db_export_excel] 开始处理...");
-        await interaction.deferReply({ ephemeral: true });
-
-        // 【修复】清除缓存，确保读取最新数据
-        cacheManager.invalidate();
-
-        // 【修改】直接从SQLite数据库读取数据
-        const allOrders = db.getAllOrders();
-        console.log(`[db_export_excel] 从SQLite读取 ${allOrders.length} 条记录`);
-
-        if (allOrders.length === 0) {
-          await interaction.editReply({
-            content: "📊 SQLite数据库中暂无数据可导出～",
-          });
-          return;
-        }
-
-        // 使用SQLite CLI导出CSV（不再使用exporter的Excel逻辑）
-        const fileName = `订单数据_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.csv`;
-        const filePath = sqliteExporter.exportToCSV(fileName);
-        
-        const reportCount = allOrders.filter(o => o.type === 'report').length;
-        const dispatchCount = allOrders.filter(o => o.type !== 'report').length;
-        const attachment = new AttachmentBuilder(filePath, { name: fileName });
-        
-        await interaction.editReply({
-          content: `✅ 已导出 ${reportCount} 条报备记录 + ${dispatchCount} 条派单记录\n📊 总计: ${allOrders.length} 条\n💾 CSV文件已生成，请下载`,
-          files: [attachment],
-        });
-        console.log("[db_export_excel] 完成");
-
-        // 同时发送到存档频道
-        setTimeout(() => {
-          sendCsvToArchive(filePath, fileName, allOrders.length, '订单中心导出');
-        }, 100);
-
-        // 异步导出到Google Sheets
-        setTimeout(() => {
-          exportToGoogleSheets(allOrders, '订单中心导出');
-        }, 200);
-
-        // 自动删除临时文件
-        sqliteExporter.deleteFileAsync(filePath, 5000);
-      } catch (err) {
-        console.error("db_export_excel 错误:", err);
-        try {
-          await interaction.editReply({
-            content: `❌ 导出 CSV 失败: ${err.message}`,
-          });
-        } catch (e) {
-          console.error("db_export_excel 回复失败:", e);
-        }
-      }
-    }
+    // /db 按钮处理器 - db_export_excel - 已改为 export_excel
+    // ---------------------------------------------------------
+    // 【已弃用】此处理器已移除，导出改为使用 export_excel
 
     // ---------------------------------------------------------
     // /db 按钮处理器 - db_export_json
@@ -3503,7 +3251,7 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
 
         const row2 = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
-            .setCustomId("db_export_excel")
+            .setCustomId("export_excel")
             .setLabel("📥 导出 Excel")
             .setStyle(ButtonStyle.Success)
             .setEmoji("📥"),
