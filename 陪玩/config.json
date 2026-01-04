@@ -10,5 +10,7 @@
   "autoStats": true,
   "telegramToken": "8213840389:AAE9QdQnB1InkwBZ0C49m36nqGudiVbIl8g",
   "telegramChatId": "-1003366056090",
-  "telegramMessageThreadId": "21"
+  "telegramMessageThreadId": "21",
+  "googleSheetsId": "1HtVCJEEOl_3-_pQ97heSet0yE041ms3pyojYzAuI7O0",
+  "googleApiKey": "AIzaSyCzqcuIlUGyePaa1bD6Mnv-QEO0f5CX33Q"
 }

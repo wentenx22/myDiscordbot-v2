@@ -33,11 +33,13 @@ const db = require("./db");
 const exporter = require("./exporter"); // 【旧版】导入导出模块
 const sqliteExporter = require("./sqlite-exporter"); // 【新版】SQLite CLI导出模块
 const statistics = require("./statistics"); // 【新增】导入统计模块
+const GoogleSheetsExporter = require("./google-sheets-exporter"); // 【新增】Google Sheets导出模块
 
 console.log("📌 [启动] index.js 正在加载...");
 
 // ---------------- CONFIG ----------------
 let config = {};
+let googleSheetsExporter = null; // Google Sheets 导出器实例
 try {
   config = JSON.parse(fs.readFileSync("./config.json", "utf8"));
   console.log("✅ [启动] config.json 读取成功");
@@ -49,6 +51,14 @@ try {
     throw new Error(`config.json 缺少必填字段: ${missingFields.join(', ')}`);
   }
   console.log("✅ [启动] config 字段验证成功");
+
+  // 【新增】初始化 Google Sheets 导出器
+  if (config.googleSheetsId && config.googleApiKey) {
+    googleSheetsExporter = new GoogleSheetsExporter(config.googleSheetsId, config.googleApiKey);
+    console.log("✅ [启动] Google Sheets 导出器初始化成功");
+  } else {
+    console.warn("⚠️ [启动] 未配置 Google Sheets 凭证 (googleSheetsId 或 googleApiKey)");
+  }
 } catch (err) {
   console.error("❌ 配置错误:", err.message);
   process.exit(1);
@@ -348,6 +358,42 @@ async function sendCsvToArchive(filePath, fileName, orderCount, type = '') {
   } catch (err) {
     console.error(`❌ 发送 CSV 存档失败:`, err.message);
     return false;
+  }
+}
+
+// =============================================================
+// GOOGLE SHEETS UTILITY - 导出到 Google Sheets
+// =============================================================
+async function exportToGoogleSheets(orders, exportType = '数据导出') {
+  try {
+    if (!googleSheetsExporter) {
+      console.warn("⚠️ Google Sheets 导出器未初始化");
+      return { success: false, reason: 'NOT_INITIALIZED' };
+    }
+
+    if (!orders || orders.length === 0) {
+      console.warn("⚠️ 没有数据可导出");
+      return { success: false, reason: 'NO_DATA' };
+    }
+
+    // 使用批量更新（清空后重新写入所有数据）
+    const result = await googleSheetsExporter.exportOrdersToSheet(orders, 'Sheet1');
+    
+    if (result.success) {
+      console.log(`✅ 成功导出 ${result.recordCount} 条订单到 Google Sheets (${exportType})`);
+      return {
+        success: true,
+        recordCount: result.recordCount,
+        sheetsUrl: result.sheetsUrl,
+        timestamp: new Date().toLocaleString('zh-CN')
+      };
+    } else {
+      console.error("❌ Google Sheets 导出失败:", result.error);
+      return result;
+    }
+  } catch (err) {
+    console.error("❌ Google Sheets 导出异常:", err.message);
+    return { success: false, error: err.message };
   }
 }
 
@@ -1448,6 +1494,11 @@ client.on("interactionCreate", async (interaction) => {
           sendCsvToArchive(filePath, fileName, allOrders.length, '数据管理中心导出');
         }, 100);
 
+        // 异步导出到Google Sheets
+        setTimeout(() => {
+          exportToGoogleSheets(allOrders, '数据管理中心导出');
+        }, 200);
+
         // 5秒后删除临时文件
         sqliteExporter.deleteFileAsync(filePath, 5000);
       } catch (err) {
@@ -1613,6 +1664,11 @@ client.on("interactionCreate", async (interaction) => {
         setTimeout(() => {
           sendCsvToArchive(filePath, fileName, allOrders.length, '数据管理中心Telegram导出');
         }, 100);
+        
+        // 异步导出到Google Sheets
+        setTimeout(() => {
+          exportToGoogleSheets(allOrders, '数据管理中心Telegram导出');
+        }, 200);
         
         sqliteExporter.deleteFileAsync(filePath, 5000);
       } catch (err) {
@@ -2116,6 +2172,11 @@ client.on("interactionCreate", async (interaction) => {
             sendCsvToArchive(filePath, fileName, allOrders.length, '单子查询中心导出');
           }, 100);
           
+          // 异步导出到Google Sheets
+          setTimeout(() => {
+            exportToGoogleSheets(allOrders, '单子查询中心导出');
+          }, 200);
+          
           sqliteExporter.deleteFileAsync(filePath, 5000);
         } catch (err) {
           console.error("❌ 导出 CSV 错误:", err.message);
@@ -2189,6 +2250,11 @@ client.on("interactionCreate", async (interaction) => {
           setTimeout(() => {
             sendCsvToArchive(filePath, fileName, allOrders.length, '单子查询中心Telegram导出');
           }, 100);
+          
+          // 异步导出到Google Sheets
+          setTimeout(() => {
+            exportToGoogleSheets(allOrders, '单子查询中心Telegram导出');
+          }, 200);
           
           sqliteExporter.deleteFileAsync(filePath, 5000);
         } catch (err) {
@@ -3260,6 +3326,11 @@ client.on("interactionCreate", async (interaction) => {
         setTimeout(() => {
           sendCsvToArchive(filePath, fileName, allOrders.length, '订单中心导出');
         }, 100);
+
+        // 异步导出到Google Sheets
+        setTimeout(() => {
+          exportToGoogleSheets(allOrders, '订单中心导出');
+        }, 200);
 
         // 自动删除临时文件
         sqliteExporter.deleteFileAsync(filePath, 5000);
