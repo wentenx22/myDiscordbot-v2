@@ -30,7 +30,8 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const db = require("./db");
-const exporter = require("./exporter"); // 【新增】导入统一的导出模块
+const exporter = require("./exporter"); // 【旧版】导入导出模块
+const sqliteExporter = require("./sqlite-exporter"); // 【新版】SQLite CLI导出模块
 const statistics = require("./statistics"); // 【新增】导入统计模块
 
 console.log("📌 [启动] index.js 正在加载...");
@@ -1363,33 +1364,45 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // ---------------------------------------------------------
-    // 数据管理中心 - 导出 Excel
+    // 数据管理中心 - 导出 CSV (从SQLite)
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "datacenter_export_excel") {
       try {
         await interaction.deferReply({ ephemeral: true });
 
-        const allOrders = statistics.loadOrdersData();
+        // 检查数据库中是否有数据
+        const allOrders = db.getAllOrders();
         if (allOrders.length === 0) {
           return await interaction.editReply({
-            content: "📊 暂无数据可导出～",
+            content: "📊 SQLite数据库中暂无数据可导出～",
           });
         }
 
-        const fileName = `单子统计_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.xlsx`;
-        const filePath = exporter.exportToExcelMultiSheet(allOrders, fileName);
-        const attachment = new AttachmentBuilder(filePath, { name: fileName });
+        // 使用SQLite CLI导出CSV
+        const fileName = `订单数据_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.csv`;
+        const filePath = sqliteExporter.exportToCSV(fileName);
+        
+        if (!filePath) {
+          return await interaction.editReply({
+            content: "❌ CSV导出失败",
+          });
+        }
 
-        const summary = statistics.calculateSummary(allOrders);
+        const attachment = new AttachmentBuilder(filePath, { name: fileName });
+        
+        // 统计报备和派单记录数
+        const reports = allOrders.filter(o => o.type === 'report');
+        const dispatches = allOrders.filter(o => o.type !== 'report' && o.type);
 
         await interaction.editReply({
-          content: `✅ 已导出 ${summary.totalReports} 条报备记录 + ${summary.totalDispatches} 条派单记录\n💾 文件已生成，请下载`,
+          content: `✅ 已导出 ${reports.length} 条报备记录 + ${dispatches.length} 条派单记录\n📊 总计: ${allOrders.length} 条\n💾 CSV文件已生成，请下载`,
           files: [attachment],
         });
 
-        exporter.deleteFileAsync(filePath, 5000);
+        // 5秒后删除临时文件
+        sqliteExporter.deleteFileAsync(filePath, 5000);
       } catch (err) {
-        console.error("导出Excel错误:", err);
+        console.error("❌ CSV导出错误:", err);
         await interaction.editReply({
           content: `❌ 导出失败: ${err.message}`,
         });
@@ -1502,29 +1515,52 @@ client.on("interactionCreate", async (interaction) => {
       try {
         await interaction.deferReply({ ephemeral: true });
 
-        const allOrders = statistics.loadOrdersData();
+        // 【修改】从SQLite数据库读取数据
+        const allOrders = db.getAllOrders();
         if (allOrders.length === 0) {
           return await interaction.editReply({
-            content: "📊 暂无数据可导出～",
+            content: "📊 SQLite数据库中暂无数据可导出～",
           });
         }
 
-        const fileName = `单子统计_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.xlsx`;
+        // 导出CSV文件
+        const fileName = `单子统计_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.csv`;
+        const filePath = sqliteExporter.exportToCSV(fileName);
+
+        // 读取CSV内容作为消息体发送到Telegram
+        const fs = require('fs');
+        const csvContent = fs.readFileSync(filePath, 'utf8');
+        const reportCount = allOrders.filter(o => o.type === 'report').length;
+        const dispatchCount = allOrders.filter(o => o.type !== 'report').length;
+        
         const telegramConfig = {
           token: config.telegramToken,
           chatId: config.telegramChatId,
           messageThreadId: config.telegramMessageThreadId,
         };
 
-        await exporter.exportExcelMultiSheetToTelegram(
-          allOrders,
-          telegramConfig,
-          `📊 <b>数据管理中心导出</b>\n⏰ ${new Date().toLocaleString("zh-CN")}\n\n✅ 已导出至 Telegram`
-        );
+        // 发送CSV到Telegram（通过FormData发送文件）
+        const FormData = require('form-data');
+        const axios = require('axios');
+        
+        const form = new FormData();
+        form.append('chat_id', telegramConfig.chatId);
+        if (telegramConfig.messageThreadId) {
+          form.append('message_thread_id', telegramConfig.messageThreadId);
+        }
+        form.append('document', fs.createReadStream(filePath), fileName);
+        form.append('caption', `📊 <b>数据管理中心导出</b>\n⏰ ${new Date().toLocaleString("zh-CN")}\n\n✅ 已导出 ${reportCount} 条报备 + ${dispatchCount} 条派单\n💾 CSV格式`);
+        form.append('parse_mode', 'HTML');
+
+        await axios.post(`https://api.telegram.org/bot${telegramConfig.token}/sendDocument`, form, {
+          headers: form.getHeaders()
+        });
 
         await interaction.editReply({
-          content: "✅ 文件已导出至 Telegram～",
+          content: "✅ CSV文件已导出至 Telegram～",
         });
+        
+        sqliteExporter.deleteFileAsync(filePath, 5000);
       } catch (err) {
         console.error("导出Telegram错误:", err);
         await interaction.editReply({
@@ -1990,59 +2026,49 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // ---------------------------------------------------------
-    // 导出 Excel 按钮
+    // 导出 CSV 按钮 (使用SQLite数据源)
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "export_excel") {
       try {
         await interaction.deferReply({ ephemeral: true });
 
-        // 【更新】直接读取 orders.json 文件
-        let allOrders = [];
-        try {
-          const ordersPath = path.join(process.cwd(), 'orders.json');
-          const ordersData = fs.readFileSync(ordersPath, 'utf8');
-          allOrders = JSON.parse(ordersData) || [];
-          console.log(`[export_excel] 从 orders.json 读取 ${allOrders.length} 条记录`);
-        } catch (err) {
-          console.error('❌ 读取 orders.json 失败:', err.message);
-          return await interaction.editReply({
-            content: "❌ 读取数据文件失败，请稍后重试～",
-          });
-        }
+        // 【修改】直接从SQLite数据库读取数据
+        const allOrders = db.getAllOrders();
+        console.log(`[export_excel] 从SQLite读取 ${allOrders.length} 条记录`);
 
         if (allOrders.length === 0) {
           return interaction.editReply({
-            content: "📊 暂无数据可导出～",
+            content: "📊 SQLite数据库中暂无数据可导出～",
           });
         }
 
-        // 使用 exporter 模块处理导出（包含报备和派单）
-        const fileName = `单子统计_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.xlsx`;
+        // 使用SQLite CLI导出CSV（不再使用exporter的Excel逻辑）
+        const fileName = `单子统计_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.csv`;
         
         try {
-          const filePath = exporter.exportToExcelMultiSheet(allOrders, fileName);
+          const filePath = sqliteExporter.exportToCSV(fileName);
           const attachment = new AttachmentBuilder(filePath, { name: fileName });
           
           const reportCount = allOrders.filter(o => o.type === 'report').length;
           const dispatchCount = allOrders.filter(o => o.type !== 'report').length;
           
           await interaction.editReply({
-            content: `✅ 已导出 ${reportCount} 条报备记录 + ${dispatchCount} 条派单记录`,
+            content: `✅ 已导出 ${reportCount} 条报备记录 + ${dispatchCount} 条派单记录\n💾 CSV文件已生成，请下载`,
             files: [attachment],
           });
           
-          exporter.deleteFileAsync(filePath, 5000);
+          sqliteExporter.deleteFileAsync(filePath, 5000);
         } catch (err) {
-          console.error("❌ 导出 Excel 错误:", err.message);
+          console.error("❌ 导出 CSV 错误:", err.message);
           await interaction.editReply({
-            content: "❌ 导出 Excel 时出错，请稍后重试～",
+            content: "❌ 导出 CSV 时出错，请稍后重试～",
           });
         }
 
       } catch (err) {
-        console.error("导出 Excel 错误:", err);
+        console.error("导出 CSV 错误:", err);
         interaction.editReply({
-          content: "❌ 导出 Excel 时出错，请稍后重试～",
+          content: "❌ 导出 CSV 时出错，请稍后重试～",
         });
       }
       return;
@@ -2055,43 +2081,52 @@ client.on("interactionCreate", async (interaction) => {
       try {
         await interaction.deferReply({ ephemeral: true });
 
-        // 【更新】直接读取 orders.json 文件
-        let allOrders = [];
-        try {
-          const ordersPath = path.join(process.cwd(), 'orders.json');
-          const ordersData = fs.readFileSync(ordersPath, 'utf8');
-          allOrders = JSON.parse(ordersData) || [];
-          console.log(`[export_telegram] 从 orders.json 读取 ${allOrders.length} 条记录`);
-        } catch (err) {
-          console.error('❌ 读取 orders.json 失败:', err.message);
-          return await interaction.editReply({
-            content: "❌ 读取数据文件失败，请稍后重试～",
-          });
-        }
-
+        // 【修改】从SQLite数据库读取数据
+        const allOrders = db.getAllOrders();
         if (allOrders.length === 0) {
           return interaction.editReply({
-            content: "📊 暂无数据可导出～",
+            content: "📊 SQLite数据库中暂无数据可导出～",
           });
         }
 
-        // 使用 exporter 模块处理导出到 Telegram（包含报备和派单）
+        // 导出CSV文件
+        const fileName = `单子统计_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.csv`;
+        const filePath = sqliteExporter.exportToCSV(fileName);
+
+        // 发送CSV到Telegram
         try {
+          const fs = require('fs');
+          const FormData = require('form-data');
+          const axios = require('axios');
+          
           const telegramConfig = {
             token: config.telegramToken,
             chatId: config.telegramChatId,
             messageThreadId: config.telegramMessageThreadId,
           };
           
-          await exporter.exportExcelMultiSheetToTelegram(
-            allOrders,
-            telegramConfig,
-            `📊 <b>单子统计数据</b>\n⏰ ${new Date().toLocaleString("zh-CN")}\n报备记录 + 派单记录\n\n✅ 已导出至 Telegram`
-          );
+          const form = new FormData();
+          form.append('chat_id', telegramConfig.chatId);
+          if (telegramConfig.messageThreadId) {
+            form.append('message_thread_id', telegramConfig.messageThreadId);
+          }
+          form.append('document', fs.createReadStream(filePath), fileName);
+          
+          const reportCount = allOrders.filter(o => o.type === 'report').length;
+          const dispatchCount = allOrders.filter(o => o.type !== 'report').length;
+          
+          form.append('caption', `📊 <b>单子统计数据</b>\n⏰ ${new Date().toLocaleString("zh-CN")}\n✅ 已导出 ${reportCount} 条报备 + ${dispatchCount} 条派单\n💾 CSV格式`);
+          form.append('parse_mode', 'HTML');
+
+          await axios.post(`https://api.telegram.org/bot${telegramConfig.token}/sendDocument`, form, {
+            headers: form.getHeaders()
+          });
           
           await interaction.editReply({
-            content: "✅ Excel 文件（报备+派单）已导出至 Telegram～",
+            content: "✅ CSV 文件（报备+派单）已导出至 Telegram～",
           });
+          
+          sqliteExporter.deleteFileAsync(filePath, 5000);
         } catch (err) {
           console.error("❌ 导出到 Telegram 错误:", err.message);
           await interaction.editReply({
@@ -3125,52 +3160,45 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // ---------------------------------------------------------
-    // /db 按钮处理器 - db_export_excel
+    // /db 按钮处理器 - db_export_excel (现在导出CSV从SQLite)
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "db_export_excel") {
       try {
         console.log("[db_export_excel] 开始处理...");
         await interaction.deferReply({ ephemeral: true });
 
-        // 【更新】直接读取 orders.json 文件
-        let allOrders = [];
-        try {
-          const ordersPath = path.join(process.cwd(), 'orders.json');
-          const ordersData = fs.readFileSync(ordersPath, 'utf8');
-          allOrders = JSON.parse(ordersData) || [];
-          console.log(`[db_export_excel] 从 orders.json 读取 ${allOrders.length} 条记录`);
-        } catch (err) {
-          console.error('❌ 读取 orders.json 失败:', err.message);
-          return await interaction.editReply({
-            content: "❌ 读取数据文件失败，请稍后重试～",
-          });
-        }
+        // 【修改】直接从SQLite数据库读取数据
+        const allOrders = db.getAllOrders();
+        console.log(`[db_export_excel] 从SQLite读取 ${allOrders.length} 条记录`);
 
         if (allOrders.length === 0) {
           await interaction.editReply({
-            content: "📊 暂无数据可导出～",
+            content: "📊 SQLite数据库中暂无数据可导出～",
           });
           return;
         }
 
-        // 使用 exporter 模块处理导出（包含报备和派单）
-        const filePath = exporter.exportToExcelMultiSheet(allOrders);
+        // 使用SQLite CLI导出CSV（不再使用exporter的Excel逻辑）
+        const fileName = `订单数据_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.csv`;
+        const filePath = sqliteExporter.exportToCSV(fileName);
+        
         const reportCount = allOrders.filter(o => o.type === 'report').length;
         const dispatchCount = allOrders.filter(o => o.type !== 'report').length;
-        const attachment = new AttachmentBuilder(filePath);
+        const attachment = new AttachmentBuilder(filePath, { name: fileName });
+        
         await interaction.editReply({
-          content: `✅ 已导出 ${reportCount} 条报备记录 + ${dispatchCount} 条派单记录`,
+          content: `✅ 已导出 ${reportCount} 条报备记录 + ${dispatchCount} 条派单记录\n📊 总计: ${allOrders.length} 条\n💾 CSV文件已生成，请下载`,
           files: [attachment],
         });
         console.log("[db_export_excel] 完成");
 
         // 自动删除临时文件
-        exporter.deleteFileAsync(filePath, 2000);
+        sqliteExporter.deleteFileAsync(filePath, 5000);
       } catch (err) {
         console.error("db_export_excel 错误:", err);
         try {
           await interaction.editReply({
-            content: `❌ 导出 Excel 失败: ${err.message}`,
+            content: `❌ 导出 CSV 失败: ${err.message}`,
           });
         } catch (e) {
           console.error("db_export_excel 回复失败:", e);
