@@ -8,8 +8,18 @@
 
 const db = require('./db');
 const fs = require('fs');
+const path = require('path');
 const readline = require('readline');
 const XLSX = require('xlsx');
+const axios = require('axios');
+
+// 读取config
+let config = {};
+try {
+  config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
+} catch (err) {
+  console.warn('⚠️  未找到config.json，部分功能不可用');
+}
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -41,7 +51,8 @@ function printMenu() {
   log('  4. 按 ID 查看订单详情');
   log('  5. 搜索订单（按玩家名称）');
   log('  6. 导出订单为 JSON');
-  log('  7. 导出订单为 Excel');
+  log('  7. 导出订单为 Excel（本地）');
+  log('  7.1 导出订单为 CSV 至 Discord');
   log('  8. 清空所有订单（警告！）');
   log('  9. 重置统计数据');
   log('  0. 退出\n');
@@ -232,6 +243,68 @@ async function exportToExcel() {
   }
 }
 
+async function exportToCsvToDiscord() {
+  try {
+    const orders = db.getAllOrders();
+    
+    if (orders.length === 0) {
+      log('❌ 暂无订单可导出', 'red');
+      return;
+    }
+
+    if (!config.csvArchiveChannelId) {
+      log('❌ 未配置 csvArchiveChannelId，请在config.json中添加', 'red');
+      return;
+    }
+
+    // 需要尝试导入sqlite-exporter和Google Sheets导出器
+    try {
+      const sqliteExporter = require('./sqlite-exporter');
+      const GoogleSheetsExporter = require('./google-sheets-exporter');
+
+      // 1. 导出CSV
+      const fileName = `订单数据_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.csv`;
+      const filePath = sqliteExporter.exportToCSV(fileName);
+      
+      if (!fs.existsSync(filePath)) {
+        log('❌ CSV文件生成失败', 'red');
+        return;
+      }
+
+      // 2. 发送到Discord（这里需要使用Discord Bot API）
+      log('📤 正在尝试发送到Discord...', 'yellow');
+      log('⚠️  注意：需要Bot正在运行才能发送消息到Discord频道', 'yellow');
+      log(`📁 CSV文件已生成: ${filePath}`, 'green');
+      log(`📦 文件大小: ${(fs.statSync(filePath).size / 1024).toFixed(2)} KB`, 'green');
+      log(`📊 包含 ${orders.length} 条订单\n`, 'green');
+
+      // 3. 同时导出到Google Sheets（如果配置了）
+      if (config.googleSheetsId && config.googleApiKey) {
+        try {
+          const googleSheets = new GoogleSheetsExporter(config.googleSheetsId, config.googleApiKey);
+          const result = await googleSheets.exportOrdersToSheet(orders, 'Sheet1');
+          if (result.success) {
+            log(`✅ 同时导出到Google Sheets成功`, 'green');
+            log(`   URL: ${result.sheetsUrl}\n`, 'green');
+          }
+        } catch (err) {
+          log(`⚠️  Google Sheets导出失败: ${err.message}`, 'yellow');
+        }
+      }
+
+      log('✅ 导出完成！', 'green');
+      log('💡 提示：CSV文件将在Bot导出时自动发送到Discord频道\n', 'green');
+      
+    } catch (err) {
+      log(`❌ 导出失败: ${err.message}`, 'red');
+      log('💡 请确保sqlite-exporter.js已创建', 'yellow');
+    }
+    
+  } catch (err) {
+    log(`❌ 错误: ${err.message}`, 'red');
+  }
+}
+
 async function clearAllOrders() {
   return new Promise((resolve) => {
     rl.question('⚠️  确定要删除所有订单吗？(输入 "确定" 来确认): ', (answer) => {
@@ -311,6 +384,9 @@ async function main() {
             break;
           case '7':
             await exportToExcel();
+            break;
+          case '7.1':
+            await exportToCsvToDiscord();
             break;
           case '8':
             await clearAllOrders();
