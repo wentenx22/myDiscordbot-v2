@@ -1460,6 +1460,9 @@ client.on("interactionCreate", async (interaction) => {
       try {
         await interaction.deferReply({ ephemeral: true });
 
+        // 【修复】清除缓存，确保读取最新数据
+        cacheManager.invalidate();
+
         // 检查数据库中是否有数据
         const allOrders = db.getAllOrders();
         if (allOrders.length === 0) {
@@ -1614,6 +1617,9 @@ client.on("interactionCreate", async (interaction) => {
     if (interaction.isButton() && interaction.customId === "datacenter_export_telegram") {
       try {
         await interaction.deferReply({ ephemeral: true });
+
+        // 【修复】清除缓存，确保读取最新数据
+        cacheManager.invalidate();
 
         // 【修改】从SQLite数据库读取数据
         const allOrders = db.getAllOrders();
@@ -2142,6 +2148,9 @@ client.on("interactionCreate", async (interaction) => {
       try {
         await interaction.deferReply({ ephemeral: true });
 
+        // 【修复】清除缓存，确保读取最新数据
+        cacheManager.invalidate();
+
         // 【修改】直接从SQLite数据库读取数据
         const allOrders = db.getAllOrders();
         console.log(`[export_excel] 从SQLite读取 ${allOrders.length} 条记录`);
@@ -2200,6 +2209,9 @@ client.on("interactionCreate", async (interaction) => {
     if (interaction.isButton() && interaction.customId === "export_telegram") {
       try {
         await interaction.deferReply({ ephemeral: true });
+
+        // 【修复】清除缓存，确保读取最新数据
+        cacheManager.invalidate();
 
         // 【修改】从SQLite数据库读取数据
         const allOrders = db.getAllOrders();
@@ -3296,6 +3308,9 @@ client.on("interactionCreate", async (interaction) => {
       try {
         console.log("[db_export_excel] 开始处理...");
         await interaction.deferReply({ ephemeral: true });
+
+        // 【修复】清除缓存，确保读取最新数据
+        cacheManager.invalidate();
 
         // 【修改】直接从SQLite数据库读取数据
         const allOrders = db.getAllOrders();
