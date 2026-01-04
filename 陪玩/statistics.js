@@ -8,25 +8,23 @@ const path = require('path');
 const db = require('./db'); // 【修改】添加数据库导入
 
 /**
- * 从 SQLite 数据库读取所有数据（优先级更高）
- * 如果数据库初始化失败，则回退到 orders.json
+ * 从 SQLite 数据库读取所有数据
+ * 唯一的数据源是SQLite，不再回退到orders.json
  */
 function loadOrdersData() {
   try {
-    // 【修改】优先从SQLite数据库读取
+    // 【修改】仅从SQLite数据库读取，不再回退到orders.json
     if (db.initialized) {
       const orders = db.getAllOrders();
-      if (Array.isArray(orders) && orders.length > 0) {
+      if (Array.isArray(orders)) {
         console.log(`✅ 从SQLite数据库加载 ${orders.length} 条订单数据`);
         return orders;
       }
     }
     
-    // 回退到orders.json
-    console.log('📖 从orders.json加载数据（SQLite数据库为空或未初始化）');
-    const ordersPath = path.join(process.cwd(), 'orders.json');
-    const ordersData = fs.readFileSync(ordersPath, 'utf8');
-    return JSON.parse(ordersData) || [];
+    // 如果数据库未初始化或读取失败，返回空数组
+    console.warn('⚠️  SQLite数据库未初始化或为空，返回空数组');
+    return [];
   } catch (err) {
     console.error('❌ 读取数据失败:', err.message);
     return [];

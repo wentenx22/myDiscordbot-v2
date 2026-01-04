@@ -2877,7 +2877,7 @@ client.on("interactionCreate", async (interaction) => {
           { name: "✅ 单据状态", value: "✔️ 已确认", inline: true }
         )
         .setFooter({
-          text: "已写入 orders.json 并更新统计 • 谢谢你的配合 💗",
+          text: "✅ 已保存至SQLite数据库 • 谢谢你的配合 💗",
         })
         .setTimestamp();
 
@@ -2981,7 +2981,7 @@ client.on("interactionCreate", async (interaction) => {
       // ⭐ 随机生成新单号
       const orderNo = generateOrderNumber();
 
-      // 写入 orders.json
+      // 保存至 SQLite 数据库
       try {
         await db.addOrder({
           type: "renew_dispatch",
@@ -3037,7 +3037,7 @@ client.on("interactionCreate", async (interaction) => {
           { name: "📦 原单号", value: `📦 ${originalOrder || "未记录"}`, inline: true }
         )
         .setFooter({
-          text: "已写入 orders.json 并更新统计 • 谢谢你的配合 💗",
+          text: "✅ 已保存至SQLite数据库 • 谢谢你的配合 💗",
         })
         .setTimestamp();
 
