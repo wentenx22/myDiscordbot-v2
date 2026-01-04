@@ -5,17 +5,30 @@
 
 const fs = require('fs');
 const path = require('path');
+const db = require('./db'); // 【修改】添加数据库导入
 
 /**
- * 从 orders.json 读取所有数据
+ * 从 SQLite 数据库读取所有数据（优先级更高）
+ * 如果数据库初始化失败，则回退到 orders.json
  */
 function loadOrdersData() {
   try {
+    // 【修改】优先从SQLite数据库读取
+    if (db.initialized) {
+      const orders = db.getAllOrders();
+      if (Array.isArray(orders) && orders.length > 0) {
+        console.log(`✅ 从SQLite数据库加载 ${orders.length} 条订单数据`);
+        return orders;
+      }
+    }
+    
+    // 回退到orders.json
+    console.log('📖 从orders.json加载数据（SQLite数据库为空或未初始化）');
     const ordersPath = path.join(process.cwd(), 'orders.json');
     const ordersData = fs.readFileSync(ordersPath, 'utf8');
     return JSON.parse(ordersData) || [];
   } catch (err) {
-    console.error('❌ 读取 orders.json 失败:', err.message);
+    console.error('❌ 读取数据失败:', err.message);
     return [];
   }
 }
