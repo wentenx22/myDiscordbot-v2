@@ -422,6 +422,9 @@ client.once("ready", async () => {
       console.log("⏳ 正在初始化数据库...");
       await db.init();
       console.log("✅ SQLite 数据库已初始化");
+      
+      // 【修复】为旧记录补上来源标记
+      db.fixMissingSource();
     } catch (err) {
       console.error("❌ 数据库初始化失败:", err.message);
       console.error("⚠️  应用将继续运行但功能受限");

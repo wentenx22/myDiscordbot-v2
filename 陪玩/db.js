@@ -306,6 +306,22 @@ class DatabaseManager {
     }
   }
 
+  // 【新增】为没有source的旧记录添加标记
+  fixMissingSource() {
+    try {
+      const stmt = this.db.prepare('UPDATE orders SET source = ? WHERE source IS NULL OR source = ""');
+      stmt.bind(['imported']);
+      stmt.step();
+      stmt.free();
+      this.save();
+      console.log('✅ 已为旧记录添加来源标记');
+      return true;
+    } catch (err) {
+      console.error('❌ 修复source失败:', err);
+      return false;
+    }
+  }
+
   // 关闭数据库连接
   close() {
     try {
