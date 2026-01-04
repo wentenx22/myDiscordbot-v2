@@ -61,6 +61,7 @@ const SUPPORT_SECOND_ROLE_ID = "1434475964963749909";
 const LOG_CHANNEL_ID = "1433987480524165213"; // 统计频道
 const AUTO_REPORTBB_CHANNEL = "1436684853297938452";
 const DB_PANEL_CHANNEL_ID = "1456648851384438978"; // /db 面板频道
+const CSV_ARCHIVE_CHANNEL_ID = "1457035667157680431"; // CSV 存档频道
 
 const SUPPORT_PATH = "./support_logs.json";
 
@@ -306,6 +307,49 @@ const autoSendPanel = async (channel, embed, components, title) => {
     return false;
   }
 };
+
+// =============================================================
+// CSV ARCHIVE UTILITY - 发送CSV到存档频道
+// =============================================================
+async function sendCsvToArchive(filePath, fileName, orderCount, type = '') {
+  try {
+    if (!client.isReady()) {
+      console.warn("⚠️ Discord 客户端未准备好，无法发送存档");
+      return false;
+    }
+
+    const channel = await client.channels.fetch(CSV_ARCHIVE_CHANNEL_ID);
+    if (!channel || !channel.isTextBased()) {
+      console.warn("⚠️ 存档频道不存在或非文本频道");
+      return false;
+    }
+
+    const fs = require('fs');
+    if (!fs.existsSync(filePath)) {
+      console.warn(`⚠️ CSV 文件不存在: ${filePath}`);
+      return false;
+    }
+
+    const timestamp = new Date().toLocaleString('zh-CN');
+    const message = `📊 **CSV 数据存档**\n` +
+      `📁 文件: ${fileName}\n` +
+      `📈 记录数: ${orderCount} 条\n` +
+      `🏷️ 类型: ${type || '导出'}\n` +
+      `⏰ 时间: ${timestamp}`;
+
+    const attachment = new AttachmentBuilder(filePath, { name: fileName });
+    await channel.send({
+      content: message,
+      files: [attachment]
+    });
+
+    console.log(`✅ CSV 已存档至频道: ${fileName}`);
+    return true;
+  } catch (err) {
+    console.error(`❌ 发送 CSV 存档失败:`, err.message);
+    return false;
+  }
+}
 
 // =============================================================
 // CLIENT INIT
@@ -1399,6 +1443,11 @@ client.on("interactionCreate", async (interaction) => {
           files: [attachment],
         });
 
+        // 同时发送到存档频道
+        setTimeout(() => {
+          sendCsvToArchive(filePath, fileName, allOrders.length, '数据管理中心导出');
+        }, 100);
+
         // 5秒后删除临时文件
         sqliteExporter.deleteFileAsync(filePath, 5000);
       } catch (err) {
@@ -1559,6 +1608,11 @@ client.on("interactionCreate", async (interaction) => {
         await interaction.editReply({
           content: "✅ CSV文件已导出至 Telegram～",
         });
+        
+        // 同时发送到存档频道
+        setTimeout(() => {
+          sendCsvToArchive(filePath, fileName, allOrders.length, '数据管理中心Telegram导出');
+        }, 100);
         
         sqliteExporter.deleteFileAsync(filePath, 5000);
       } catch (err) {
@@ -2057,6 +2111,11 @@ client.on("interactionCreate", async (interaction) => {
             files: [attachment],
           });
           
+          // 同时发送到存档频道
+          setTimeout(() => {
+            sendCsvToArchive(filePath, fileName, allOrders.length, '单子查询中心导出');
+          }, 100);
+          
           sqliteExporter.deleteFileAsync(filePath, 5000);
         } catch (err) {
           console.error("❌ 导出 CSV 错误:", err.message);
@@ -2125,6 +2184,11 @@ client.on("interactionCreate", async (interaction) => {
           await interaction.editReply({
             content: "✅ CSV 文件（报备+派单）已导出至 Telegram～",
           });
+          
+          // 同时发送到存档频道
+          setTimeout(() => {
+            sendCsvToArchive(filePath, fileName, allOrders.length, '单子查询中心Telegram导出');
+          }, 100);
           
           sqliteExporter.deleteFileAsync(filePath, 5000);
         } catch (err) {
@@ -3191,6 +3255,11 @@ client.on("interactionCreate", async (interaction) => {
           files: [attachment],
         });
         console.log("[db_export_excel] 完成");
+
+        // 同时发送到存档频道
+        setTimeout(() => {
+          sendCsvToArchive(filePath, fileName, allOrders.length, '订单中心导出');
+        }, 100);
 
         // 自动删除临时文件
         sqliteExporter.deleteFileAsync(filePath, 5000);
