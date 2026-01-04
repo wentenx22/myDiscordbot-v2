@@ -1782,9 +1782,17 @@ client.on("interactionCreate", async (interaction) => {
 
         // 根据筛选数据计算统计（使用statistics格式化）
         const summary = statistics.calculateSummary(filteredOrders);
-        const assigners = statistics.getAssignerRanking(filteredOrders);
-        const players = statistics.getPlayerRanking(filteredOrders);
-        const bosses = statistics.getBossRanking(filteredOrders);
+        
+        // 【架构改造】如果是时间范围筛选，使用SQLite GROUP BY查询排行
+        let assigners, players;
+        if (value !== "all") {
+          const [startStr, endStr] = value.split("_");
+          assigners = db.getAssignerRankingByDateRange(startStr, endStr);
+          players = db.getPlayerRankingByDateRange(startStr, endStr);
+        } else {
+          assigners = db.getAssignerRankingFromDB();
+          players = db.getPlayerRankingFromDB();
+        }
 
         const embed = new EmbedBuilder()
           .setColor(THEME_COLOR)
@@ -1891,7 +1899,8 @@ client.on("interactionCreate", async (interaction) => {
         console.log("[自定义时间筛选] 日期格式验证通过");
 
         // 【架构改造】使用SQLite WHERE查询而非JS数组filter
-        const filteredOrders = db.getOrdersByDateRange(startDateTime.split(' ')[0], endDateTime.split(' ')[0]);
+        const dateStr = startDateTime.split(' ')[0];
+        const filteredOrders = db.getOrdersByDateRange(dateStr, dateStr);
         console.log(`[自定义时间筛选] 从SQLite查询得到 ${filteredOrders.length} 条订单`);
 
         await interaction.deferReply({ ephemeral: true });
@@ -1904,8 +1913,9 @@ client.on("interactionCreate", async (interaction) => {
 
         // 根据筛选数据计算统计
         const summary = statistics.calculateSummary(filteredOrders);
-        const assigners = statistics.getAssignerRanking(filteredOrders);
-        const players = statistics.getPlayerRanking(filteredOrders);
+        // 【架构改造】使用SQLite GROUP BY查询排行而非JS计算
+        const assigners = db.getAssignerRankingByDateRange(dateStr, dateStr);
+        const players = db.getPlayerRankingByDateRange(dateStr, dateStr);
 
         const embed = new EmbedBuilder()
           .setColor(THEME_COLOR)

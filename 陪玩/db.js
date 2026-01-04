@@ -497,6 +497,45 @@ class DatabaseManager {
   }
 
   /**
+   * 获取指定日期范围内的派单员排行（从SQLite GROUP BY）
+   */
+  getAssignerRankingByDateRange(startDate, endDate) {
+    try {
+      const startDateTime = startDate + ' 00:00:00';
+      const endDateTime = endDate + ' 23:59:59';
+
+      const stmt = this.db.prepare(`
+        SELECT 
+          assigner,
+          COUNT(*) as count,
+          COALESCE(SUM(CAST(price AS INTEGER)), 0) as totalPrice
+        FROM orders
+        WHERE type != 'report' AND assigner IS NOT NULL AND assigner != ''
+          AND date >= ? AND date <= ?
+        GROUP BY assigner
+        ORDER BY totalPrice DESC
+        LIMIT 10
+      `);
+      stmt.bind([startDateTime, endDateTime]);
+
+      const results = [];
+      while (stmt.step()) {
+        const row = stmt.getAsObject();
+        results.push({
+          name: row.assigner,
+          count: parseInt(row.count) || 0,
+          totalPrice: parseInt(row.totalPrice) || 0
+        });
+      }
+      stmt.free();
+      return results;
+    } catch (err) {
+      console.error('❌ 获取日期范围派单员排行失败:', err);
+      return [];
+    }
+  }
+
+  /**
    * 获取陪玩员排行（从SQLite GROUP BY）
    */
   getPlayerRankingFromDB() {
@@ -560,6 +599,45 @@ class DatabaseManager {
       return results;
     } catch (err) {
       console.error('❌ 获取老板排行失败:', err);
+      return [];
+    }
+  }
+
+  /**
+   * 获取指定日期范围内的陪玩员排行（从SQLite GROUP BY）
+   */
+  getPlayerRankingByDateRange(startDate, endDate) {
+    try {
+      const startDateTime = startDate + ' 00:00:00';
+      const endDateTime = endDate + ' 23:59:59';
+
+      const stmt = this.db.prepare(`
+        SELECT 
+          player,
+          COUNT(*) as count,
+          COALESCE(SUM(CAST(price AS INTEGER)), 0) as total
+        FROM orders
+        WHERE type != 'report' AND player IS NOT NULL AND player != ''
+          AND date >= ? AND date <= ?
+        GROUP BY player
+        ORDER BY total DESC
+        LIMIT 10
+      `);
+      stmt.bind([startDateTime, endDateTime]);
+
+      const results = [];
+      while (stmt.step()) {
+        const row = stmt.getAsObject();
+        results.push({
+          name: row.player,
+          count: parseInt(row.count) || 0,
+          total: parseInt(row.total) || 0
+        });
+      }
+      stmt.free();
+      return results;
+    } catch (err) {
+      console.error('❌ 获取日期范围陪玩员排行失败:', err);
       return [];
     }
   }
