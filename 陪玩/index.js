@@ -57,7 +57,7 @@ try {
 const TICKET_CATEGORY_ID = "1434345592997548033";
 const SUPPORT_CATEGORY_ID = "1433718201690357808";
 const SUPPORT_SECOND_ROLE_ID = "1434475964963749909";
-const LOG_CHANNEL_ID = "1436268020866617494"; // 统计频道
+const LOG_CHANNEL_ID = "1433987480524165213"; // 统计频道
 const AUTO_REPORTBB_CHANNEL = "1436684853297938452";
 const DB_PANEL_CHANNEL_ID = "1456648851384438978"; // /db 面板频道
 
@@ -457,7 +457,7 @@ client.once("ready", async () => {
 
   // 4️⃣ Bot 启动通知
   try {
-    const notifyChannel = client.channels.cache.get("1436268020866617494"); // 统计频道ID
+    const notifyChannel = client.channels.cache.get("1433987480524165213"); // 统计频道ID
     if (notifyChannel) {
       await notifyChannel.send("🟢 Bot 已启动 / 重启完成");
       console.log("🟢 启动通知已发送");
