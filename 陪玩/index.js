@@ -454,6 +454,19 @@ client.once("ready", async () => {
   } catch (err) {
     console.error("supportsetup auto error:", err);
   }
+
+  // 4️⃣ Bot 启动通知
+  try {
+    const notifyChannel = client.channels.cache.get("1436268020866617494"); // 统计频道ID
+    if (notifyChannel) {
+      await notifyChannel.send("🟢 Bot 已启动 / 重启完成");
+      console.log("🟢 启动通知已发送");
+    } else {
+      console.warn("⚠️  启动通知频道未找到");
+    }
+  } catch (err) {
+    console.error("❌ 发送启动通知出错:", err.message);
+  }
 });
 
 
