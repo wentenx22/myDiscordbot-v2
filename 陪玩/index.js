@@ -2145,62 +2145,113 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // ---------------------------------------------------------
-    // 导出 CSV 按钮 (使用SQLite数据源)
+    // 导出 CSV 按钮 - 【完全重写】使用 SQLite CLI 实时查询
+    // 【约束】仅使用 SQLite 数据源，无缓存、无 JSON、无 db.getAllOrders()
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "export_excel") {
       try {
         await interaction.deferReply({ ephemeral: true });
 
-        // 【修复】清除缓存，确保读取最新数据
-        cacheManager.invalidate();
+        // 🔴【CRITICAL】不允许使用任何缓存、JSON 或中间读取
+        // - ❌ cacheManager.invalidate() - 禁止
+        // - ❌ db.getAllOrders() - 禁止
+        // - ❌ statistics.loadOrdersData() - 禁止
+        // - ❌ orders.json - 禁止
+        // ✅ 仅使用 SQLite CLI 直接查询
 
-        // 【修改】直接从SQLite数据库读取数据
-        const allOrders = db.getAllOrders();
-        console.log(`[export_excel] 从SQLite读取 ${allOrders.length} 条记录`);
-
-        if (allOrders.length === 0) {
-          return interaction.editReply({
-            content: "📊 SQLite数据库中暂无数据可导出～",
-          });
+        const DB_PATH = path.join(__dirname, 'data.db');
+        const TMP_DIR = path.join(__dirname, 'tmp');
+        
+        // 确保 tmp 目录存在
+        if (!fs.existsSync(TMP_DIR)) {
+          fs.mkdirSync(TMP_DIR, { recursive: true });
         }
 
-        // 使用SQLite CLI导出CSV（不再使用exporter的Excel逻辑）
+        // 【步骤 1】使用 SQLite CLI 实时查询 & 导出 CSV
+        // 【关键】每次都执行新的 SELECT 查询，确保获取最新数据
         const fileName = `单子统计_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.csv`;
+        const filePath = path.join(TMP_DIR, fileName);
+
+        console.log(`[export_excel] 🔄 开始使用 SQLite CLI 导出...`);
+        console.log(`[export_excel] 数据库路径: ${DB_PATH}`);
+        console.log(`[export_excel] 输出路径: ${filePath}`);
+
+        // 【关键步骤】使用 sqlite3 CLI 导出 CSV
+        // .headers on    → 包含列名
+        // .mode csv      → CSV 格式
+        // .output        → 输出到文件
+        // SELECT ... ORDER BY id DESC → 最新数据优先
+        const { execSync } = require('child_process');
         
         try {
-          const filePath = sqliteExporter.exportToCSV(fileName);
+          // 【实时执行 SQLite 查询】
+          const sql = `
+.mode csv
+.headers on
+.output "${filePath}"
+SELECT id, type, boss, player, assigner, orderType, game, duration, amount, price, date, source, orderNo, customer, source_channel FROM orders ORDER BY id DESC;
+.output stdout
+`;
+          
+          const cmd = `sqlite3 "${DB_PATH}" "${sql}"`;
+          execSync(cmd, { encoding: 'utf8', stdio: 'pipe' });
+
+          console.log(`[export_excel] ✅ SQLite CLI 导出完成`);
+
+          // 【步骤 2】验证文件是否成功创建
+          if (!fs.existsSync(filePath)) {
+            throw new Error(`CSV 文件未成功创建: ${filePath}`);
+          }
+
+          const fileSize = fs.statSync(filePath).size;
+          console.log(`[export_excel] 📁 文件大小: ${(fileSize / 1024).toFixed(2)} KB`);
+
+          // 【步骤 3】读取 CSV 内容，计算行数（不使用 db.getAllOrders()）
+          const csvContent = fs.readFileSync(filePath, 'utf8');
+          const lines = csvContent.split('\n').filter(l => l.trim());
+          const dataRowCount = Math.max(0, lines.length - 1); // 减去 header 行
+          
+          console.log(`[export_excel] 📊 数据行数: ${dataRowCount}`);
+
+          // 【步骤 4】作为 Discord 附件发送
           const attachment = new AttachmentBuilder(filePath, { name: fileName });
           
-          const reportCount = allOrders.filter(o => o.type === 'report').length;
-          const dispatchCount = allOrders.filter(o => o.type !== 'report').length;
-          
           await interaction.editReply({
-            content: `✅ 已导出 ${reportCount} 条报备记录 + ${dispatchCount} 条派单记录\n💾 CSV文件已生成，请下载`,
+            content: `✅ CSV 已从 SQLite 实时导出\n📊 共 ${dataRowCount} 条记录\n💾 文件已生成，请下载`,
             files: [attachment],
           });
-          
-          // 同时发送到存档频道
+
+          console.log(`[export_excel] ✅ 附件已发送到 Discord`);
+
+          // 【步骤 5】异步清理本地文件（5 秒后删除）
           setTimeout(() => {
-            sendCsvToArchive(filePath, fileName, allOrders.length, '单子查询中心导出');
-          }, 100);
+            try {
+              if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+                console.log(`[export_excel] 🗑️  临时文件已删除: ${fileName}`);
+              }
+            } catch (err) {
+              console.error(`[export_excel] ❌ 删除文件失败: ${err.message}`);
+            }
+          }, 5000);
+
+        } catch (execErr) {
+          console.error(`[export_excel] ❌ SQLite CLI 执行失败:`, execErr.message);
           
-          // 异步导出到Google Sheets
-          setTimeout(() => {
-            exportToGoogleSheets(allOrders, '单子查询中心导出');
-          }, 200);
+          // 删除失败的文件
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
           
-          sqliteExporter.deleteFileAsync(filePath, 5000);
-        } catch (err) {
-          console.error("❌ 导出 CSV 错误:", err.message);
-          await interaction.editReply({
-            content: "❌ 导出 CSV 时出错，请稍后重试～",
-          });
+          throw new Error(`SQLite 导出失败: ${execErr.message}`);
         }
 
       } catch (err) {
-        console.error("导出 CSV 错误:", err);
-        interaction.editReply({
-          content: "❌ 导出 CSV 时出错，请稍后重试～",
+        console.error(`[export_excel] ❌ 导出流程异常:`, err.message);
+        console.error(`[export_excel] 错误堆栈:`, err.stack);
+        
+        await interaction.editReply({
+          content: `❌ 导出失败: ${err.message}\n\n💡 请检查：\n• SQLite 数据库是否可访问\n• 磁盘空间是否充足\n• 权限设置是否正确`,
         });
       }
       return;
