@@ -72,33 +72,12 @@ const LOG_CHANNEL_ID = "1433987480524165213"; // 统计频道
 const AUTO_REPORTBB_CHANNEL = "1436684853297938452";
 const DB_PANEL_CHANNEL_ID = "1456648851384438978"; // /db 面板频道
 const CSV_ARCHIVE_CHANNEL_ID = "1457035667157680431"; // CSV 存档频道
-
 const SUPPORT_PATH = "./support_logs.json";
 
 // 主题颜色（樱花粉）
 const THEME_COLOR = 0xff99cc;
 
-// 【修复问题 6】数据缓存机制
-const cacheManager = {
-  orders: null,
-  lastFetchTime: 0,
-  cacheDuration: 5000, // 5秒缓存
-  
-  async getOrders() {
-    const now = Date.now();
-    if (this.orders && now - this.lastFetchTime < this.cacheDuration) {
-      return this.orders; // 返回缓存
-    }
-    this.orders = await db.getAllOrders();
-    this.lastFetchTime = now;
-    return this.orders;
-  },
-  
-  invalidate() {
-    this.orders = null;
-    this.lastFetchTime = 0;
-  }
-};
+// 【架构改造】移除cacheManager - 所有数据都实时从SQLite查询
 
 // 【修复问题 8】Map 清理机制
 const addOrderContext = new Map();
@@ -817,7 +796,7 @@ client.on("interactionCreate", async (interaction) => {
           // 通过查询最后一条记录来获取 ID
           const allOrders = await db.getAllOrders();
           orderId = allOrders[0]?.id || null;
-          cacheManager.invalidate(); // 【修复问题 6】清除缓存
+          // 【架构改造】不再使用cacheManager，所有数据源都来自SQLite
         } catch (e) {
           console.error("❌ 保存报备到数据库失败：", e.message);
           return await interaction.reply({
@@ -890,19 +869,19 @@ client.on("interactionCreate", async (interaction) => {
         components: [row],
       });
 
-      // ✅ 管理员频道：发送包含老板名字的完整版本
-      try {
-        const logChannel =
-          interaction.guild.channels.cache.get(LOG_CHANNEL_ID) ||
-          (await interaction.guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null));
-        if (logChannel) {
-          await logChannel.send({ embeds: [embed] });
-        } else {
-          console.warn("⚠️ 日志频道不存在或无法访问");
-        }
-      } catch (err) {
-        console.error("❌ 发送管理员报备 embed 失败：", err.message);
-      }
+      // ✅ 【禁用】管理员频道：发送包含老板名字的完整版本 - 单子报备不需要发去该频道
+      // try {
+      //   const logChannel =
+      //     interaction.guild.channels.cache.get(LOG_CHANNEL_ID) ||
+      //     (await interaction.guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null));
+      //   if (logChannel) {
+      //     await logChannel.send({ embeds: [embed] });
+      //   } else {
+      //     console.warn("⚠️ 日志频道不存在或无法访问");
+      //   }
+      // } catch (err) {
+      //   console.error("❌ 发送管理员报备 embed 失败：", err.message);
+      // }
 
       return;
       } catch (err) {
@@ -1003,17 +982,17 @@ client.on("interactionCreate", async (interaction) => {
         components: [row],
       });
 
-      // ✅ 管理员频道：发送完整信息的 embed
-      try {
-        const logChannel =
-          interaction.guild.channels.cache.get(LOG_CHANNEL_ID) ||
-          (await interaction.guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null));
-        if (logChannel) {
-          await logChannel.send({ embeds: [embed] });
-        }
-      } catch (err) {
-        console.error("发送管理员礼物报备 embed 失败：", err);
-      }
+      // ✅ 【禁用】管理员频道：发送完整信息的 embed - 单子报备不需要发去该频道
+      // try {
+      //   const logChannel =
+      //     interaction.guild.channels.cache.get(LOG_CHANNEL_ID) ||
+      //     (await interaction.guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null));
+      //   if (logChannel) {
+      //     await logChannel.send({ embeds: [embed] });
+      //   }
+      // } catch (err) {
+      //   console.error("发送管理员礼物报备 embed 失败：", err);
+      // }
 
       return;
     }
@@ -1164,17 +1143,17 @@ client.on("interactionCreate", async (interaction) => {
         components: [row],
       });
 
-      // ✅ 管理员频道：发送包含老板名字的完整版本
-      try {
-        const logChannel =
-          interaction.guild.channels.cache.get(LOG_CHANNEL_ID) ||
-          (await interaction.guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null));
-        if (logChannel) {
-          await logChannel.send({ embeds: [embed] });
-        }
-      } catch (err) {
-        console.error("发送管理员续单报备 embed 失败：", err);
-      }
+      // ✅ 【禁用】管理员频道：发送包含老板名字的完整版本 - 单子报备不需要发去该频道
+      // try {
+      //   const logChannel =
+      //     interaction.guild.channels.cache.get(LOG_CHANNEL_ID) ||
+      //     (await interaction.guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null));
+      //   if (logChannel) {
+      //     await logChannel.send({ embeds: [embed] });
+      //   }
+      // } catch (err) {
+      //   console.error("发送管理员续单报备 embed 失败：", err);
+      // }
 
       return;
     }
@@ -1318,7 +1297,7 @@ client.on("interactionCreate", async (interaction) => {
         
         await db.updateOrderNumber(orderId, orderNumber);
         updatedOrderInfo = await db.getOrderById(orderId);
-        cacheManager.invalidate(); // 【修复问题 6】清除缓存
+        // 【架构改造】不再使用cacheManager，所有数据源都来自SQLite
       } catch (e) {
         console.error("❌ 更新数据库单号失败：", e.message);
         return await interaction.reply({
@@ -2736,12 +2715,13 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
         })
         .setTimestamp();
 
-      const logChannel =
-        guild.channels.cache.get(LOG_CHANNEL_ID) ||
-        (await guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null));
-      if (logChannel) {
-        await logChannel.send({ embeds: [embed] });
-      }
+      // 【禁用】派单记录不需要发去LOG_CHANNEL_ID
+      // const logChannel =
+      //   guild.channels.cache.get(LOG_CHANNEL_ID) ||
+      //   (await guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null));
+      // if (logChannel) {
+      //   await logChannel.send({ embeds: [embed] });
+      // }
 
       // 检查channel是否存在（可能已被删除）
       if (interaction.channel) {
@@ -2896,12 +2876,13 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
         })
         .setTimestamp();
 
-      const logChannel =
-        guild.channels.cache.get(LOG_CHANNEL_ID) ||
-        (await guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null));
-      if (logChannel) {
-        await logChannel.send({ embeds: [embed] });
-      }
+      // 【禁用】续单记录不需要发去LOG_CHANNEL_ID
+      // const logChannel =
+      //   guild.channels.cache.get(LOG_CHANNEL_ID) ||
+      //   (await guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null));
+      // if (logChannel) {
+      //   await logChannel.send({ embeds: [embed] });
+      // }
 
       // 检查channel是否存在（可能已被删除）
       if (interaction.channel) {
