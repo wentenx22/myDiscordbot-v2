@@ -3,8 +3,32 @@
 // 变更说明：
 // - 在 client.once("ready") 中增加自动检测 LOG_CHANNEL_ID 是否存在 "📊 派单统计中心" embed
 // - 若不存在则自动发送统计 embed + 按钮（粉色可爱风）
-// 其它：继承 v4.2b-Pink 的 UI 与功能（移除关键词自动回复）
+// 其它：继承 v4.2b-Pink 的 UI 与 功能（移除关键词自动回复）
 // =============================================================
+
+// 加载环境变量
+require('dotenv').config();
+
+// 替换配置文件中的环境变量
+const loadConfig = () => {
+  let config = require('./config.json');
+  const env = process.env;
+  
+  // 替换所有 ${VAR} 格式的环境变量
+  const replaceEnvVars = (obj) => {
+    for (let key in obj) {
+      if (typeof obj[key] === 'string' && obj[key].startsWith('${') && obj[key].endsWith('}')) {
+        const envVarName = obj[key].slice(2, -1);
+        obj[key] = env[envVarName] || obj[key];
+      }
+    }
+    return obj;
+  };
+  
+  return replaceEnvVars(config);
+};
+
+const config = loadConfig();
 
 // ---------------- IMPORTS ----------------
 const {
