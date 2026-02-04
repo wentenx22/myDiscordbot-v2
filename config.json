@@ -1,7 +1,7 @@
 {
-  "token": "${DISCORD_BOT_TOKEN}",
-  "clientId": "${DISCORD_CLIENT_ID}",
-  "guildId": "${DISCORD_GUILD_ID}",
+  "token": "MTQzMzk0NTAwOTY0NzkxNTA4MQ.GjBvHZ.E4VufhgYmSy6S4QaSwArgdVxpZg9q6fnsXvlI0",
+  "clientId": "1433945009647915081",
+  "guildId": "1433718200692117667",
   "adminRoleId": "1433888286006312970",
   "welcomeChannelId": "1433718201690357801",
   "ticketToolChannelId": "1434021343401218189", 
