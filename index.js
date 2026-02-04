@@ -1,12 +1,16 @@
+﻿// 【!最优先!】为低版本Node.js添加ReadableStream polyfill - 必须在所有require前执行
+if (typeof ReadableStream === 'undefined') {
+  global.ReadableStream = require('stream').Readable;
+}
 // =============================================================
-// index.js - v4.2c-Pink (v4.2b-Pink 基础上新增：开机自动检测并发送派单统计中心面板)
-// 变更说明：
-// - 在 client.once("ready") 中增加自动检测 LOG_CHANNEL_ID 是否存在 "📊 派单统计中心" embed
-// - 若不存在则自动发送统计 embed + 按钮（粉色可爱风）
-// 其它：继承 v4.2b-Pink 的 UI 与 功能（移除关键词自动回复）
+// index.js - v4.2c-Pink (v4.2b-Pink åŸºç¡€ä¸Šæ–°å¢žï¼šå¼€æœºè‡ªåŠ¨æ£€æµ‹å¹¶å‘é€æ´¾å•ç»Ÿè®¡ä¸­å¿ƒé¢æ¿)
+// å˜æ›´è¯´æ˜Žï¼š
+// - åœ¨ client.once("ready") ä¸­å¢žåŠ è‡ªåŠ¨æ£€æµ‹ LOG_CHANNEL_ID æ˜¯å¦å­˜åœ¨ "ðŸ“Š æ´¾å•ç»Ÿè®¡ä¸­å¿ƒ" embed
+// - è‹¥ä¸å­˜åœ¨åˆ™è‡ªåŠ¨å‘é€ç»Ÿè®¡ embed + æŒ‰é’®ï¼ˆç²‰è‰²å¯çˆ±é£Žï¼‰
+// å…¶å®ƒï¼šç»§æ‰¿ v4.2b-Pink çš„ UI ä¸Ž åŠŸèƒ½ï¼ˆç§»é™¤å…³é”®è¯è‡ªåŠ¨å›žå¤ï¼‰
 // =============================================================
 
-// 加载环境变量
+// åŠ è½½çŽ¯å¢ƒå˜é‡
 
 // ---------------- IMPORTS ----------------
 const {
@@ -32,37 +36,37 @@ const fs = require("fs");
 const path = require("path");
 const axios = require("axios");
 const db = require("./db");
-const exporter = require("./exporter"); // 【旧版】导入导出模块
-const sqliteExporter = require("./sqlite-exporter"); // 【新版】SQLite CLI导出模块
-const statistics = require("./statistics"); // 【新增】导入统计模块
-const GoogleSheetsExporter = require("./google-sheets-exporter"); // 【新增】Google Sheets导出模块
+const exporter = require("./exporter"); // ã€æ—§ç‰ˆã€‘å¯¼å…¥å¯¼å‡ºæ¨¡å—
+const sqliteExporter = require("./sqlite-exporter"); // ã€æ–°ç‰ˆã€‘SQLite CLIå¯¼å‡ºæ¨¡å—
+const statistics = require("./statistics"); // ã€æ–°å¢žã€‘å¯¼å…¥ç»Ÿè®¡æ¨¡å—
+const GoogleSheetsExporter = require("./google-sheets-exporter"); // ã€æ–°å¢žã€‘Google Sheetså¯¼å‡ºæ¨¡å—
 
-console.log("📌 [启动] index.js 正在加载...");
+console.log("ðŸ“Œ [å¯åŠ¨] index.js æ­£åœ¨åŠ è½½...");
 
 // ---------------- CONFIG ----------------
 let config = {};
-let googleSheetsExporter = null; // Google Sheets 导出器实例
+let googleSheetsExporter = null; // Google Sheets å¯¼å‡ºå™¨å®žä¾‹
 try {
   config = JSON.parse(fs.readFileSync("./config.json", "utf8"));
-  console.log("✅ [启动] config.json 读取成功");
+  console.log("âœ… [å¯åŠ¨] config.json è¯»å–æˆåŠŸ");
   
-  // 【新增】验证必填字段
+  // ã€æ–°å¢žã€‘éªŒè¯å¿…å¡«å­—æ®µ
   const requiredFields = ['token', 'clientId', 'telegramToken', 'telegramChatId', 'adminRoleId'];
   const missingFields = requiredFields.filter(f => !config[f]);
   if (missingFields.length > 0) {
-    throw new Error(`config.json 缺少必填字段: ${missingFields.join(', ')}`);
+    throw new Error(`config.json ç¼ºå°‘å¿…å¡«å­—æ®µ: ${missingFields.join(', ')}`);
   }
-  console.log("✅ [启动] config 字段验证成功");
+  console.log("âœ… [å¯åŠ¨] config å­—æ®µéªŒè¯æˆåŠŸ");
 
-  // 【新增】初始化 Google Sheets 导出器
+  // ã€æ–°å¢žã€‘åˆå§‹åŒ– Google Sheets å¯¼å‡ºå™¨
   if (config.googleSheetsId && config.googleApiKey) {
     googleSheetsExporter = new GoogleSheetsExporter(config.googleSheetsId, config.googleApiKey);
-    console.log("✅ [启动] Google Sheets 导出器初始化成功");
+    console.log("âœ… [å¯åŠ¨] Google Sheets å¯¼å‡ºå™¨åˆå§‹åŒ–æˆåŠŸ");
   } else {
-    console.warn("⚠️ [启动] 未配置 Google Sheets 凭证 (googleSheetsId 或 googleApiKey)");
+    console.warn("âš ï¸ [å¯åŠ¨] æœªé…ç½® Google Sheets å‡­è¯ (googleSheetsId æˆ– googleApiKey)");
   }
 } catch (err) {
-  console.error("❌ 配置错误:", err.message);
+  console.error("âŒ é…ç½®é”™è¯¯:", err.message);
   process.exit(1);
 }
 
@@ -70,30 +74,30 @@ try {
 const TICKET_CATEGORY_ID = "1434345592997548033";
 const SUPPORT_CATEGORY_ID = "1433718201690357808";
 const SUPPORT_SECOND_ROLE_ID = "1434475964963749909";
-const LOG_CHANNEL_ID = "1433987480524165213"; // 统计频道
+const LOG_CHANNEL_ID = "1433987480524165213"; // ç»Ÿè®¡é¢‘é“
 const AUTO_REPORTBB_CHANNEL = "1436684853297938452";
-const REPORT_DISPATCH_CHANNEL_ID = "1436268020866617494"; // 报备派单频道
-const DB_PANEL_CHANNEL_ID = "1456648851384438978"; // /db 面板频道
-const CSV_ARCHIVE_CHANNEL_ID = "1457035667157680431"; // CSV 存档频道
+const REPORT_DISPATCH_CHANNEL_ID = "1436268020866617494"; // æŠ¥å¤‡æ´¾å•é¢‘é“
+const DB_PANEL_CHANNEL_ID = "1456648851384438978"; // /db é¢æ¿é¢‘é“
+const CSV_ARCHIVE_CHANNEL_ID = "1457035667157680431"; // CSV å­˜æ¡£é¢‘é“
 const SUPPORT_PATH = "./support_logs.json";
 
-// 主题颜色（樱花粉）
+// ä¸»é¢˜é¢œè‰²ï¼ˆæ¨±èŠ±ç²‰ï¼‰
 const THEME_COLOR = 0xff99cc;
 
-// 【架构改造】移除cacheManager - 所有数据都实时从SQLite查询
+// ã€æž¶æž„æ”¹é€ ã€‘ç§»é™¤cacheManager - æ‰€æœ‰æ•°æ®éƒ½å®žæ—¶ä»ŽSQLiteæŸ¥è¯¢
 
-// 【修复问题 8】Map 清理机制
+// ã€ä¿®å¤é—®é¢˜ 8ã€‘Map æ¸…ç†æœºåˆ¶
 const addOrderContext = new Map();
 const addOrderContextCleanup = (key, timeout = 300000) => {
   setTimeout(() => {
     if (addOrderContext.has(key)) {
       addOrderContext.delete(key);
-      console.log(`🗑️ 上下文已清理: ${key}`);
+      console.log(`ðŸ—‘ï¸ ä¸Šä¸‹æ–‡å·²æ¸…ç†: ${key}`);
     }
   }, timeout);
 };
 
-// 【修复问题 8】Ticket Timer 清理机制
+// ã€ä¿®å¤é—®é¢˜ 8ã€‘Ticket Timer æ¸…ç†æœºåˆ¶
 const ticketTimers = new Map();
 const ticketTimerCleanup = (key) => {
   if (ticketTimers.has(key)) {
@@ -102,28 +106,28 @@ const ticketTimerCleanup = (key) => {
   }
 };
 
-// 报备频道 ID（用于消息监听）
+// æŠ¥å¤‡é¢‘é“ IDï¼ˆç”¨äºŽæ¶ˆæ¯ç›‘å¬ï¼‰
 const REPORT_CHANNEL_ID = config.reportChannelId || AUTO_REPORTBB_CHANNEL;
 
-// ticket超时时间（24小时）
+// ticketè¶…æ—¶æ—¶é—´ï¼ˆ24å°æ—¶ï¼‰
 const TICKET_TIMEOUT = 24 * 60 * 60 * 1000;
 
 // =============================================================
-// JSON STORAGE UTILITIES (仅用于 support_logs.json)
+// JSON STORAGE UTILITIES (ä»…ç”¨äºŽ support_logs.json)
 // =============================================================
-const initFile = (p, d) => !fs.existsSync(p) && (fs.writeFileSync(p, JSON.stringify(d, null, 2), "utf8"), console.log(`✅ 已创建 ${p}`));
+const initFile = (p, d) => !fs.existsSync(p) && (fs.writeFileSync(p, JSON.stringify(d, null, 2), "utf8"), console.log(`âœ… å·²åˆ›å»º ${p}`));
 const initStorage = () => initFile(SUPPORT_PATH, []);
 
-// 【修复问题 11】改进 JSON 读取，添加详细错误日志
+// ã€ä¿®å¤é—®é¢˜ 11ã€‘æ”¹è¿› JSON è¯»å–ï¼Œæ·»åŠ è¯¦ç»†é”™è¯¯æ—¥å¿—
 const readJSON = p => { 
   try { 
     if (!fs.existsSync(p)) {
-      console.warn(`⚠️ 文件不存在: ${p}`);
+      console.warn(`âš ï¸ æ–‡ä»¶ä¸å­˜åœ¨: ${p}`);
       return null;
     }
     return JSON.parse(fs.readFileSync(p, "utf8")); 
   } catch (err) { 
-    console.error(`❌ JSON 读取失败 (${p}):`, err.message);
+    console.error(`âŒ JSON è¯»å–å¤±è´¥ (${p}):`, err.message);
     return null; 
   } 
 };
@@ -132,16 +136,16 @@ const writeJSON = (p, d) => {
   try {
     fs.writeFileSync(p, JSON.stringify(d, null, 2), "utf8");
   } catch (err) {
-    console.error(`❌ JSON 写入失败 (${p}):`, err.message);
+    console.error(`âŒ JSON å†™å…¥å¤±è´¥ (${p}):`, err.message);
   }
 };
 
-// 【修复问题 14】用户输入验证函数
+// ã€ä¿®å¤é—®é¢˜ 14ã€‘ç”¨æˆ·è¾“å…¥éªŒè¯å‡½æ•°
 const validateInput = (input, type = 'text', maxLen = 100) => {
   if (typeof input !== 'string') return null;
   const trimmed = input.trim().slice(0, maxLen);
   
-  // 防止 Discord markdown 注入
+  // é˜²æ­¢ Discord markdown æ³¨å…¥
   const sanitized = trimmed.replace(/[`~*_|\\]/g, '');
   
   if (type === 'number') {
@@ -155,12 +159,12 @@ const validateInput = (input, type = 'text', maxLen = 100) => {
 const sanitizeName = n => String(n).toLowerCase().replace(/[^a-z0-9-]/g, "-");
 const parsePrice = n => Number(String(n).replace(/[^0-9.]/g, "")) || 0;
 const generateOrderNumber = () => { const d = new Date().toISOString().slice(0, 10).replace(/-/g, ""); return `PO-${d}-${Math.floor(1000 + Math.random() * 9000)}`; };
-const sep = () => "━━━━━━━━━━━━━━━━━━━━━━━━━━━━";
+const sep = () => "â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”";
 
 // =============================================================
 // TELEGRAM UTILITIES
 // =============================================================
-// 【修复问题 10】改进 Telegram 错误处理
+// ã€ä¿®å¤é—®é¢˜ 10ã€‘æ”¹è¿› Telegram é”™è¯¯å¤„ç†
 async function sendTelegramReport(chatId, message, threadId = null) {
   const url = `https://api.telegram.org/bot${config.telegramToken}/sendMessage`;
   try {
@@ -170,24 +174,24 @@ async function sendTelegramReport(chatId, message, threadId = null) {
       parse_mode: "HTML",
       ...(threadId && { message_thread_id: threadId })
     });
-    console.log("✅ Telegram 报表已发送!");
+    console.log("âœ… Telegram æŠ¥è¡¨å·²å‘é€!");
     return { success: true };
   } catch (err) {
     const errorDesc = err.response?.data?.description || err.message;
     const errorCode = err.response?.status || 'UNKNOWN';
     
-    // 区分不同的错误类型
+    // åŒºåˆ†ä¸åŒçš„é”™è¯¯ç±»åž‹
     if (errorDesc?.includes("TOPIC_DELETED")) {
-      console.warn("⚠️ Telegram 话题已被删除，跳过发送");
+      console.warn("âš ï¸ Telegram è¯é¢˜å·²è¢«åˆ é™¤ï¼Œè·³è¿‡å‘é€");
       return { success: false, reason: 'TOPIC_DELETED' };
     } else if (errorCode === 429) {
-      console.warn("⚠️ Telegram 限流，请稍后重试");
+      console.warn("âš ï¸ Telegram é™æµï¼Œè¯·ç¨åŽé‡è¯•");
       return { success: false, reason: 'RATE_LIMITED' };
     } else if (errorCode === 401) {
-      console.error("❌ Telegram token 无效");
+      console.error("âŒ Telegram token æ— æ•ˆ");
       return { success: false, reason: 'INVALID_TOKEN' };
     } else {
-      console.error(`❌ Telegram 发送失败 (${errorCode}):`, errorDesc);
+      console.error(`âŒ Telegram å‘é€å¤±è´¥ (${errorCode}):`, errorDesc);
       return { success: false, reason: 'UNKNOWN', error: errorDesc };
     }
   }
@@ -197,11 +201,11 @@ const sendToMultipleTelegram = (msg, t1) => sendTelegramReport(config.telegramCh
 // =============================================================
 // DATABASE HEALTH CHECK
 // =============================================================
-// 【修复问题 12】数据库初始化验证函数
+// ã€ä¿®å¤é—®é¢˜ 12ã€‘æ•°æ®åº“åˆå§‹åŒ–éªŒè¯å‡½æ•°
 const ensureDbInitialized = async () => {
   if (!db.initialized) {
-    console.error("❌ 数据库尚未初始化");
-    throw new Error('数据库未就绪，请稍后重试');
+    console.error("âŒ æ•°æ®åº“å°šæœªåˆå§‹åŒ–");
+    throw new Error('æ•°æ®åº“æœªå°±ç»ªï¼Œè¯·ç¨åŽé‡è¯•');
   }
   return true;
 };
@@ -213,122 +217,122 @@ async function buildDbPanelEmbed() {
   try {
     await ensureDbInitialized();
     const stats = await db.getStats();
-    // 【架构改造】使用db.getAllOrders()替代cacheManager.getOrders()
+    // ã€æž¶æž„æ”¹é€ ã€‘ä½¿ç”¨db.getAllOrders()æ›¿ä»£cacheManager.getOrders()
     const allOrders = db.getAllOrders();
 
     const embed = new EmbedBuilder()
       .setColor(0xff99cc)
-      .setTitle("📊 数据库管理中心")
-      .setDescription("选择下方功能按钮进行相应操作～")
+      .setTitle("ðŸ“Š æ•°æ®åº“ç®¡ç†ä¸­å¿ƒ")
+      .setDescription("é€‰æ‹©ä¸‹æ–¹åŠŸèƒ½æŒ‰é’®è¿›è¡Œç›¸åº”æ“ä½œï½ž")
     .setFields(
       {
-        name: "📈 数据库统计",
-        value: `\`\`\`\n总订单数: ${stats.totalOrders || 0}\n总收入: RM ${(stats.totalRevenue || 0).toFixed(2)}\n记录总数: ${allOrders.length}\n最后更新: ${stats.lastUpdated || "未知"}\n\`\`\``,
+        name: "ðŸ“ˆ æ•°æ®åº“ç»Ÿè®¡",
+        value: `\`\`\`\næ€»è®¢å•æ•°: ${stats.totalOrders || 0}\næ€»æ”¶å…¥: RM ${(stats.totalRevenue || 0).toFixed(2)}\nè®°å½•æ€»æ•°: ${allOrders.length}\næœ€åŽæ›´æ–°: ${stats.lastUpdated || "æœªçŸ¥"}\n\`\`\``,
         inline: false,
       }
     )
-    .setFooter({ text: "💡 提示: 点击下方按钮选择功能" });
+    .setFooter({ text: "ðŸ’¡ æç¤º: ç‚¹å‡»ä¸‹æ–¹æŒ‰é’®é€‰æ‹©åŠŸèƒ½" });
 
   const row1 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("db_info")
-      .setLabel("📊 数据库信息")
+      .setLabel("ðŸ“Š æ•°æ®åº“ä¿¡æ¯")
       .setStyle(ButtonStyle.Primary)
-      .setEmoji("📊"),
+      .setEmoji("ðŸ“Š"),
 
     new ButtonBuilder()
       .setCustomId("db_edit")
-      .setLabel("✏️ 编辑数据")
+      .setLabel("âœï¸ ç¼–è¾‘æ•°æ®")
       .setStyle(ButtonStyle.Primary)
-      .setEmoji("✏️"),
+      .setEmoji("âœï¸"),
 
     new ButtonBuilder()
       .setCustomId("db_manager")
-      .setLabel("⚙️ 数据管理")
+      .setLabel("âš™ï¸ æ•°æ®ç®¡ç†")
       .setStyle(ButtonStyle.Primary)
-      .setEmoji("⚙️")
+      .setEmoji("âš™ï¸")
   );
 
   const row2 = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("export_excel")
-      .setLabel("📥 导出 Excel")
+      .setLabel("ðŸ“¥ å¯¼å‡º Excel")
       .setStyle(ButtonStyle.Success)
-      .setEmoji("📥"),
+      .setEmoji("ðŸ“¥"),
 
     new ButtonBuilder()
       .setCustomId("db_export_json")
-      .setLabel("💾 导出 JSON")
+      .setLabel("ðŸ’¾ å¯¼å‡º JSON")
       .setStyle(ButtonStyle.Success)
-      .setEmoji("💾"),
+      .setEmoji("ðŸ’¾"),
 
     new ButtonBuilder()
       .setCustomId("db_refresh")
-      .setLabel("🔄 刷新数据")
+      .setLabel("ðŸ”„ åˆ·æ–°æ•°æ®")
       .setStyle(ButtonStyle.Secondary)
-      .setEmoji("🔄")
+      .setEmoji("ðŸ”„")
   );
 
   return { embeds: [embed], components: [row1, row2] };
   } catch (err) {
-    console.error("❌ 构建数据库面板失败:", err.message);
+    console.error("âŒ æž„å»ºæ•°æ®åº“é¢æ¿å¤±è´¥:", err.message);
     const fallbackEmbed = new EmbedBuilder()
       .setColor(0xff0000)
-      .setTitle("❌ 数据库面板加载失败")
-      .setDescription(`错误: ${err.message}`);
+      .setTitle("âŒ æ•°æ®åº“é¢æ¿åŠ è½½å¤±è´¥")
+      .setDescription(`é”™è¯¯: ${err.message}`);
     return { embeds: [fallbackEmbed], components: [] };
   }
 }
 
-// 自动发送消息到频道（检查是否已存在）- 【改进】添加完整错误处理
+// è‡ªåŠ¨å‘é€æ¶ˆæ¯åˆ°é¢‘é“ï¼ˆæ£€æŸ¥æ˜¯å¦å·²å­˜åœ¨ï¼‰- ã€æ”¹è¿›ã€‘æ·»åŠ å®Œæ•´é”™è¯¯å¤„ç†
 const autoSendPanel = async (channel, embed, components, title) => {
   if (!channel) {
-    console.warn(`⚠️  频道不存在，跳过『${title}』面板`);
+    console.warn(`âš ï¸  é¢‘é“ä¸å­˜åœ¨ï¼Œè·³è¿‡ã€Ž${title}ã€é¢æ¿`);
     return false;
   }
   try {
     const msgs = await channel.messages.fetch({ limit: 20 }).catch(() => null);
     if (msgs?.some(m => m.author.id === client.user.id && m.embeds?.[0]?.title === title)) {
-      console.log(`ℹ️ 『${title}』面板已存在，跳过`);
+      console.log(`â„¹ï¸ ã€Ž${title}ã€é¢æ¿å·²å­˜åœ¨ï¼Œè·³è¿‡`);
       return false;
     }
     await channel.send({ embeds: [embed], components });
-    console.log(`✅ 已发送『${title}』面板`);
+    console.log(`âœ… å·²å‘é€ã€Ž${title}ã€é¢æ¿`);
     return true;
   } catch (err) {
-    console.error(`❌ 发送『${title}』面板失败:`, err.message);
+    console.error(`âŒ å‘é€ã€Ž${title}ã€é¢æ¿å¤±è´¥:`, err.message);
     return false;
   }
 };
 
 // =============================================================
-// CSV ARCHIVE UTILITY - 发送CSV到存档频道
+// CSV ARCHIVE UTILITY - å‘é€CSVåˆ°å­˜æ¡£é¢‘é“
 // =============================================================
 async function sendCsvToArchive(filePath, fileName, orderCount, type = '') {
   try {
     if (!client.isReady()) {
-      console.warn("⚠️ Discord 客户端未准备好，无法发送存档");
+      console.warn("âš ï¸ Discord å®¢æˆ·ç«¯æœªå‡†å¤‡å¥½ï¼Œæ— æ³•å‘é€å­˜æ¡£");
       return false;
     }
 
     const channel = await client.channels.fetch(CSV_ARCHIVE_CHANNEL_ID);
     if (!channel || !channel.isTextBased()) {
-      console.warn("⚠️ 存档频道不存在或非文本频道");
+      console.warn("âš ï¸ å­˜æ¡£é¢‘é“ä¸å­˜åœ¨æˆ–éžæ–‡æœ¬é¢‘é“");
       return false;
     }
 
     const fs = require('fs');
     if (!fs.existsSync(filePath)) {
-      console.warn(`⚠️ CSV 文件不存在: ${filePath}`);
+      console.warn(`âš ï¸ CSV æ–‡ä»¶ä¸å­˜åœ¨: ${filePath}`);
       return false;
     }
 
     const timestamp = new Date().toLocaleString('zh-CN');
-    const message = `📊 **CSV 数据存档**\n` +
-      `📁 文件: ${fileName}\n` +
-      `📈 记录数: ${orderCount} 条\n` +
-      `🏷️ 类型: ${type || '导出'}\n` +
-      `⏰ 时间: ${timestamp}`;
+    const message = `ðŸ“Š **CSV æ•°æ®å­˜æ¡£**\n` +
+      `ðŸ“ æ–‡ä»¶: ${fileName}\n` +
+      `ðŸ“ˆ è®°å½•æ•°: ${orderCount} æ¡\n` +
+      `ðŸ·ï¸ ç±»åž‹: ${type || 'å¯¼å‡º'}\n` +
+      `â° æ—¶é—´: ${timestamp}`;
 
     const attachment = new AttachmentBuilder(filePath, { name: fileName });
     await channel.send({
@@ -336,34 +340,34 @@ async function sendCsvToArchive(filePath, fileName, orderCount, type = '') {
       files: [attachment]
     });
 
-    console.log(`✅ CSV 已存档至频道: ${fileName}`);
+    console.log(`âœ… CSV å·²å­˜æ¡£è‡³é¢‘é“: ${fileName}`);
     return true;
   } catch (err) {
-    console.error(`❌ 发送 CSV 存档失败:`, err.message);
+    console.error(`âŒ å‘é€ CSV å­˜æ¡£å¤±è´¥:`, err.message);
     return false;
   }
 }
 
 // =============================================================
-// GOOGLE SHEETS UTILITY - 导出到 Google Sheets
+// GOOGLE SHEETS UTILITY - å¯¼å‡ºåˆ° Google Sheets
 // =============================================================
-async function exportToGoogleSheets(orders, exportType = '数据导出') {
+async function exportToGoogleSheets(orders, exportType = 'æ•°æ®å¯¼å‡º') {
   try {
     if (!googleSheetsExporter) {
-      console.warn("⚠️ Google Sheets 导出器未初始化");
+      console.warn("âš ï¸ Google Sheets å¯¼å‡ºå™¨æœªåˆå§‹åŒ–");
       return { success: false, reason: 'NOT_INITIALIZED' };
     }
 
     if (!orders || orders.length === 0) {
-      console.warn("⚠️ 没有数据可导出");
+      console.warn("âš ï¸ æ²¡æœ‰æ•°æ®å¯å¯¼å‡º");
       return { success: false, reason: 'NO_DATA' };
     }
 
-    // 使用批量更新（清空后重新写入所有数据）
+    // ä½¿ç”¨æ‰¹é‡æ›´æ–°ï¼ˆæ¸…ç©ºåŽé‡æ–°å†™å…¥æ‰€æœ‰æ•°æ®ï¼‰
     const result = await googleSheetsExporter.exportOrdersToSheet(orders, 'Sheet1');
     
     if (result.success) {
-      console.log(`✅ 成功导出 ${result.recordCount} 条订单到 Google Sheets (${exportType})`);
+      console.log(`âœ… æˆåŠŸå¯¼å‡º ${result.recordCount} æ¡è®¢å•åˆ° Google Sheets (${exportType})`);
       return {
         success: true,
         recordCount: result.recordCount,
@@ -371,11 +375,11 @@ async function exportToGoogleSheets(orders, exportType = '数据导出') {
         timestamp: new Date().toLocaleString('zh-CN')
       };
     } else {
-      console.error("❌ Google Sheets 导出失败:", result.error);
+      console.error("âŒ Google Sheets å¯¼å‡ºå¤±è´¥:", result.error);
       return result;
     }
   } catch (err) {
-    console.error("❌ Google Sheets 导出异常:", err.message);
+    console.error("âŒ Google Sheets å¯¼å‡ºå¼‚å¸¸:", err.message);
     return { success: false, error: err.message };
   }
 }
@@ -396,27 +400,27 @@ const client = new Client({
 initStorage();
 
 client.once("ready", async () => {
-  console.log(`✅ 已登入：${client.user.tag}`);
-  client.user.setActivity("💞 陪玩系统已启动");
+  console.log(`âœ… å·²ç™»å…¥ï¼š${client.user.tag}`);
+  client.user.setActivity("ðŸ’ž é™ªçŽ©ç³»ç»Ÿå·²å¯åŠ¨");
 
-  // 【改进】初始化数据库 - 改为 Promise 链，确保初始化完成后再继续
+  // ã€æ”¹è¿›ã€‘åˆå§‹åŒ–æ•°æ®åº“ - æ”¹ä¸º Promise é“¾ï¼Œç¡®ä¿åˆå§‹åŒ–å®ŒæˆåŽå†ç»§ç»­
   if (!db.initialized) {
     try {
-      console.log("⏳ 正在初始化数据库...");
+      console.log("â³ æ­£åœ¨åˆå§‹åŒ–æ•°æ®åº“...");
       await db.init();
-      console.log("✅ SQLite 数据库已初始化");
+      console.log("âœ… SQLite æ•°æ®åº“å·²åˆå§‹åŒ–");
       
-      // 【修复】为旧记录补上来源标记
+      // ã€ä¿®å¤ã€‘ä¸ºæ—§è®°å½•è¡¥ä¸Šæ¥æºæ ‡è®°
       db.fixMissingSource();
     } catch (err) {
-      console.error("❌ 数据库初始化失败:", err.message);
-      console.error("⚠️  应用将继续运行但功能受限");
-      // 不退出进程，允许 bot 继续运行但记录错误
+      console.error("âŒ æ•°æ®åº“åˆå§‹åŒ–å¤±è´¥:", err.message);
+      console.error("âš ï¸  åº”ç”¨å°†ç»§ç»­è¿è¡Œä½†åŠŸèƒ½å—é™");
+      // ä¸é€€å‡ºè¿›ç¨‹ï¼Œå…è®¸ bot ç»§ç»­è¿è¡Œä½†è®°å½•é”™è¯¯
       return;
     }
   }
 
-  // 【修复问题 19】每小时清理一次支持日志（删除1天前的日志）
+  // ã€ä¿®å¤é—®é¢˜ 19ã€‘æ¯å°æ—¶æ¸…ç†ä¸€æ¬¡æ”¯æŒæ—¥å¿—ï¼ˆåˆ é™¤1å¤©å‰çš„æ—¥å¿—ï¼‰
   setInterval(() => {
     try {
       const logs = readJSON(SUPPORT_PATH);
@@ -426,71 +430,71 @@ client.once("ready", async () => {
           try {
             return log.timestamp > oneDayAgo;
           } catch {
-            return true; // 保留无法解析的日志
+            return true; // ä¿ç•™æ— æ³•è§£æžçš„æ—¥å¿—
           }
         });
         
         if (filtered.length < logs.length) {
           writeJSON(SUPPORT_PATH, filtered);
-          console.log(`🧹 支持日志已清理: 删除 ${logs.length - filtered.length} 条过期日志`);
+          console.log(`ðŸ§¹ æ”¯æŒæ—¥å¿—å·²æ¸…ç†: åˆ é™¤ ${logs.length - filtered.length} æ¡è¿‡æœŸæ—¥å¿—`);
         }
       }
     } catch (err) {
-      console.error("❌ 清理支持日志出错:", err.message);
+      console.error("âŒ æ¸…ç†æ”¯æŒæ—¥å¿—å‡ºé”™:", err.message);
     }
-  }, 60 * 60 * 1000); // 每小时执行一次
+  }, 60 * 60 * 1000); // æ¯å°æ—¶æ‰§è¡Œä¸€æ¬¡
 
   const guild = client.guilds.cache.first();
   if (!guild) {
-    console.warn("⚠️  未找到首个服务器，自动面板初始化被跳过");
+    console.warn("âš ï¸  æœªæ‰¾åˆ°é¦–ä¸ªæœåŠ¡å™¨ï¼Œè‡ªåŠ¨é¢æ¿åˆå§‹åŒ–è¢«è·³è¿‡");
     return;
   }
 
-  // 1️⃣ 自动检测：单子报备面板
+  // 1ï¸âƒ£ è‡ªåŠ¨æ£€æµ‹ï¼šå•å­æŠ¥å¤‡é¢æ¿
   try {
     const channel = guild.channels.cache.get(AUTO_REPORTBB_CHANNEL);
     const embed = new EmbedBuilder()
       .setColor(0xff77ff)
-      .setTitle("📌 单子报备")
-      .setDescription("麻烦陪陪们接单后报备一下哈，以方便我们后续核实单子谢谢🥰");
+      .setTitle("ðŸ“Œ å•å­æŠ¥å¤‡")
+      .setDescription("éº»çƒ¦é™ªé™ªä»¬æŽ¥å•åŽæŠ¥å¤‡ä¸€ä¸‹å“ˆï¼Œä»¥æ–¹ä¾¿æˆ‘ä»¬åŽç»­æ ¸å®žå•å­è°¢è°¢ðŸ¥°");
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId("open_report_modal").setLabel("🔗报备单子").setStyle(ButtonStyle.Primary),
-      new ButtonBuilder().setCustomId("open_renew_report_modal").setLabel("🔄 续单报备").setStyle(ButtonStyle.Success),
-      new ButtonBuilder().setCustomId("open_gift_modal").setLabel("🎁 礼物报备").setStyle(ButtonStyle.Secondary)
+      new ButtonBuilder().setCustomId("open_report_modal").setLabel("ðŸ”—æŠ¥å¤‡å•å­").setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId("open_renew_report_modal").setLabel("ðŸ”„ ç»­å•æŠ¥å¤‡").setStyle(ButtonStyle.Success),
+      new ButtonBuilder().setCustomId("open_gift_modal").setLabel("ðŸŽ ç¤¼ç‰©æŠ¥å¤‡").setStyle(ButtonStyle.Secondary)
     );
-    await autoSendPanel(channel, embed, [row], "📌 单子报备");
-  } catch (err) { console.error("报备面板错误:", err); }
+    await autoSendPanel(channel, embed, [row], "ðŸ“Œ å•å­æŠ¥å¤‡");
+  } catch (err) { console.error("æŠ¥å¤‡é¢æ¿é”™è¯¯:", err); }
 
   // ==================================================================
-  // 2️⃣ 自动检测：陪玩下单系统（ticketsetup）
+  // 2ï¸âƒ£ è‡ªåŠ¨æ£€æµ‹ï¼šé™ªçŽ©ä¸‹å•ç³»ç»Ÿï¼ˆticketsetupï¼‰
   // ==================================================================
   try {
-    const ticketChannel = guild.channels.cache.get("1433718201690357802"); // 下单系统频道
+    const ticketChannel = guild.channels.cache.get("1433718201690357802"); // ä¸‹å•ç³»ç»Ÿé¢‘é“
     if (ticketChannel) {
       const msgs = await ticketChannel.messages.fetch({ limit: 20 }).catch(() => null);
 
       const exists = msgs?.some(
         (m) =>
           m.author.id === client.user.id &&
-          m.embeds?.[0]?.title === "🎟️  陪玩下单系统"
+          m.embeds?.[0]?.title === "ðŸŽŸï¸  é™ªçŽ©ä¸‹å•ç³»ç»Ÿ"
       );
 
       if (!exists) {
         const embed = new EmbedBuilder()
           .setColor(0xff8cff)
-          .setTitle("🎟️  陪玩下单系统")
+          .setTitle("ðŸŽŸï¸  é™ªçŽ©ä¸‹å•ç³»ç»Ÿ")
           .setThumbnail("https://cdn.discordapp.com/attachments/1433987480524165213/1440965791313952868/Generated_Image_November_20_2025_-_1_45PM.png?ex=69201378&is=691ec1f8&hm=2ba4de5f511070f09474d79525165cc9ce3a552b90766c65963546a58710f6a7&")
-          .setDescription(`${sep()}\n点下面的按钮填写陪玩单吧～ 💖\n${sep()}`);
+          .setDescription(`${sep()}\nç‚¹ä¸‹é¢çš„æŒ‰é’®å¡«å†™é™ªçŽ©å•å§ï½ž ðŸ’–\n${sep()}`);
 
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId("open_ticket")
-            .setLabel("🎮 申请陪玩订单")
+            .setLabel("ðŸŽ® ç”³è¯·é™ªçŽ©è®¢å•")
             .setStyle(ButtonStyle.Primary)
         );
 
         await ticketChannel.send({ embeds: [embed], components: [row] });
-        console.log("🎮 自动发送『陪玩下单系统面板』完成");
+        console.log("ðŸŽ® è‡ªåŠ¨å‘é€ã€Žé™ªçŽ©ä¸‹å•ç³»ç»Ÿé¢æ¿ã€å®Œæˆ");
       }
     }
   } catch (err) {
@@ -498,51 +502,51 @@ client.once("ready", async () => {
   }
 
   // ==================================================================
-  // 3️⃣ 自动检测：客服系统（supportsetup）
+  // 3ï¸âƒ£ è‡ªåŠ¨æ£€æµ‹ï¼šå®¢æœç³»ç»Ÿï¼ˆsupportsetupï¼‰
   // ==================================================================
   try {
-    const supportChannel = guild.channels.cache.get("1434458460824801282"); // 客服频道
+    const supportChannel = guild.channels.cache.get("1434458460824801282"); // å®¢æœé¢‘é“
     if (supportChannel) {
       const msgs = await supportChannel.messages.fetch({ limit: 20 }).catch(() => null);
 
       const exists = msgs?.some(
         (m) =>
           m.author.id === client.user.id &&
-          m.embeds?.[0]?.title === "💬 客服中心"
+          m.embeds?.[0]?.title === "ðŸ’¬ å®¢æœä¸­å¿ƒ"
       );
 
       if (!exists) {
         const embed = new EmbedBuilder()
           .setColor(0x00aaff)
-          .setTitle("💬 客服中心")
+          .setTitle("ðŸ’¬ å®¢æœä¸­å¿ƒ")
           .setThumbnail("https://cdn.discordapp.com/attachments/1433987480524165213/1440965790764503060/Generated_Image_November_20_2025_-_1_44PM.png?ex=69201378&is=691ec1f8&hm=b557cca8284e29b7c5610a868db7d6ae31610c0c4fd8d8e717bad59cbc0c839b&")
-          .setDescription(`${sep()}\n需要帮助？点击下方按钮联系工作人员。\n${sep()}`);
+          .setDescription(`${sep()}\néœ€è¦å¸®åŠ©ï¼Ÿç‚¹å‡»ä¸‹æ–¹æŒ‰é’®è”ç³»å·¥ä½œäººå‘˜ã€‚\n${sep()}`);
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId("open_support")
-            .setLabel("💬 联系客服")
+            .setLabel("ðŸ’¬ è”ç³»å®¢æœ")
             .setStyle(ButtonStyle.Secondary)
         );
 
         await supportChannel.send({ embeds: [embed], components: [row] });
-        console.log("💬 自动发送『客服系统面板』完成");
+        console.log("ðŸ’¬ è‡ªåŠ¨å‘é€ã€Žå®¢æœç³»ç»Ÿé¢æ¿ã€å®Œæˆ");
       }
     }
   } catch (err) {
     console.error("supportsetup auto error:", err);
   }
 
-  // 4️⃣ Bot 启动通知
+  // 4ï¸âƒ£ Bot å¯åŠ¨é€šçŸ¥
   try {
-    const notifyChannel = client.channels.cache.get("1433987480524165213"); // 统计频道ID
+    const notifyChannel = client.channels.cache.get("1433987480524165213"); // ç»Ÿè®¡é¢‘é“ID
     if (notifyChannel) {
-      await notifyChannel.send("🟢 Bot 已启动 / 重启完成");
-      console.log("🟢 启动通知已发送");
+      await notifyChannel.send("ðŸŸ¢ Bot å·²å¯åŠ¨ / é‡å¯å®Œæˆ");
+      console.log("ðŸŸ¢ å¯åŠ¨é€šçŸ¥å·²å‘é€");
     } else {
-      console.warn("⚠️  启动通知频道未找到");
+      console.warn("âš ï¸  å¯åŠ¨é€šçŸ¥é¢‘é“æœªæ‰¾åˆ°");
     }
   } catch (err) {
-    console.error("❌ 发送启动通知出错:", err.message);
+    console.error("âŒ å‘é€å¯åŠ¨é€šçŸ¥å‡ºé”™:", err.message);
   }
 });
 
@@ -553,47 +557,47 @@ client.once("ready", async () => {
 const commands = [
   new SlashCommandBuilder()
     .setName("reportbb")
-    .setDescription("建立单子报备面板")
+    .setDescription("å»ºç«‹å•å­æŠ¥å¤‡é¢æ¿")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName("ticketsetup")
-    .setDescription("创建陪玩订单按钮")
+    .setDescription("åˆ›å»ºé™ªçŽ©è®¢å•æŒ‰é’®")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   new SlashCommandBuilder()
     .setName("supportsetup")
-    .setDescription("创建客服按钮")
+    .setDescription("åˆ›å»ºå®¢æœæŒ‰é’®")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
-  // 新增：恢复统计按钮面板的指令（管理员权限）
+  // æ–°å¢žï¼šæ¢å¤ç»Ÿè®¡æŒ‰é’®é¢æ¿çš„æŒ‡ä»¤ï¼ˆç®¡ç†å‘˜æƒé™ï¼‰
   new SlashCommandBuilder()
     .setName("statssetup")
-    .setDescription("创建订单统计按钮面板")
+    .setDescription("åˆ›å»ºè®¢å•ç»Ÿè®¡æŒ‰é’®é¢æ¿")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
-  // 新增：查询报备和单子记录
+  // æ–°å¢žï¼šæŸ¥è¯¢æŠ¥å¤‡å’Œå•å­è®°å½•
   new SlashCommandBuilder()
     .setName("queryrecords")
-    .setDescription("查询单子报备和单子记录")
+    .setDescription("æŸ¥è¯¢å•å­æŠ¥å¤‡å’Œå•å­è®°å½•")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
   
-  // 新增：手动更新/发送统计 embed（绑定 /record）
+  // æ–°å¢žï¼šæ‰‹åŠ¨æ›´æ–°/å‘é€ç»Ÿè®¡ embedï¼ˆç»‘å®š /recordï¼‰
   new SlashCommandBuilder()
     .setName("record")
-    .setDescription("更新/发送派单统计 embed 到统计频道（管理员）")
+    .setDescription("æ›´æ–°/å‘é€æ´¾å•ç»Ÿè®¡ embed åˆ°ç»Ÿè®¡é¢‘é“ï¼ˆç®¡ç†å‘˜ï¼‰")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
-  // 新增：数据库管理主命令
+  // æ–°å¢žï¼šæ•°æ®åº“ç®¡ç†ä¸»å‘½ä»¤
   new SlashCommandBuilder()
     .setName("db")
-    .setDescription("📊 数据库管理中心 - 查看、编辑、导出订单数据")
+    .setDescription("ðŸ“Š æ•°æ®åº“ç®¡ç†ä¸­å¿ƒ - æŸ¥çœ‹ã€ç¼–è¾‘ã€å¯¼å‡ºè®¢å•æ•°æ®")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
-  // 新增：数据管理中心命令
+  // æ–°å¢žï¼šæ•°æ®ç®¡ç†ä¸­å¿ƒå‘½ä»¤
   new SlashCommandBuilder()
     .setName("datacenter")
-    .setDescription("📊 数据管理中心 - 统计、分析、导出、检查数据")
+    .setDescription("ðŸ“Š æ•°æ®ç®¡ç†ä¸­å¿ƒ - ç»Ÿè®¡ã€åˆ†æžã€å¯¼å‡ºã€æ£€æŸ¥æ•°æ®")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 ];
 
@@ -604,22 +608,22 @@ const rest = new REST({ version: "10" }).setToken(config.token);
     await rest.put(Routes.applicationCommands(config.clientId), {
       body: commands,
     });
-    console.log("✅ Slash 指令注册成功");
+    console.log("âœ… Slash æŒ‡ä»¤æ³¨å†ŒæˆåŠŸ");
   } catch (err) {
-    console.error("❌ 注册 Slash 指令失败：", err);
+    console.error("âŒ æ³¨å†Œ Slash æŒ‡ä»¤å¤±è´¥ï¼š", err);
   }
 })();
 
-// === 第 1 段结束 ===
-// 接下来我将发送第 2 段（报备系统：open_report_modal、reportForm 提交、add_order_number modal 相关）
-// 若准备好了请回复：发送第 2 段
+// === ç¬¬ 1 æ®µç»“æŸ ===
+// æŽ¥ä¸‹æ¥æˆ‘å°†å‘é€ç¬¬ 2 æ®µï¼ˆæŠ¥å¤‡ç³»ç»Ÿï¼šopen_report_modalã€reportForm æäº¤ã€add_order_number modal ç›¸å…³ï¼‰
+// è‹¥å‡†å¤‡å¥½äº†è¯·å›žå¤ï¼šå‘é€ç¬¬ 2 æ®µ
 // =============================================================
-// INTERACTION HANDLER（报备系统部分）
+// INTERACTION HANDLERï¼ˆæŠ¥å¤‡ç³»ç»Ÿéƒ¨åˆ†ï¼‰
 // =============================================================
 client.on("interactionCreate", async (interaction) => {
   try {
     // ---------------------------------------------------------
-    // /reportbb（创建报备按钮面板）
+    // /reportbbï¼ˆåˆ›å»ºæŠ¥å¤‡æŒ‰é’®é¢æ¿ï¼‰
     // ---------------------------------------------------------
     if (
       interaction.isChatInputCommand() &&
@@ -627,21 +631,21 @@ client.on("interactionCreate", async (interaction) => {
     ) {
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("📌 单子报备")
-        .setDescription(`\n✨ 麻烦陪陪们接单后报备一下哈，以方便我们后续核实单子，谢谢你～ 💗\n`);
+        .setTitle("ðŸ“Œ å•å­æŠ¥å¤‡")
+        .setDescription(`\nâœ¨ éº»çƒ¦é™ªé™ªä»¬æŽ¥å•åŽæŠ¥å¤‡ä¸€ä¸‹å“ˆï¼Œä»¥æ–¹ä¾¿æˆ‘ä»¬åŽç»­æ ¸å®žå•å­ï¼Œè°¢è°¢ä½ ï½ž ðŸ’—\n`);
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("open_report_modal")
-          .setLabel("🔗 报备单子")
+          .setLabel("ðŸ”— æŠ¥å¤‡å•å­")
           .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
           .setCustomId("open_renew_report_modal")
-          .setLabel("🔄 续单报备")
+          .setLabel("ðŸ”„ ç»­å•æŠ¥å¤‡")
           .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
           .setCustomId("open_gift_modal")
-          .setLabel("🎁 礼物报备")
+          .setLabel("ðŸŽ ç¤¼ç‰©æŠ¥å¤‡")
           .setStyle(ButtonStyle.Secondary)
       );
 
@@ -650,7 +654,7 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // ---------------------------------------------------------
-    // 打开报备 Modal
+    // æ‰“å¼€æŠ¥å¤‡ Modal
     // ---------------------------------------------------------
     if (
       interaction.isButton() &&
@@ -658,45 +662,45 @@ client.on("interactionCreate", async (interaction) => {
     ) {
       const modal = new ModalBuilder()
         .setCustomId("reportForm")
-        .setTitle("📄 单子报备");
+        .setTitle("ðŸ“„ å•å­æŠ¥å¤‡");
 
       modal.addComponents(
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("boss")
-            .setLabel("🧑‍💼 老板名字")
-            .setPlaceholder("例如：老板编号#1234")
+            .setLabel("ðŸ§‘â€ðŸ’¼ è€æ¿åå­—")
+            .setPlaceholder("ä¾‹å¦‚ï¼šè€æ¿ç¼–å·#1234")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("player")
-            .setLabel("🧚‍♀️ 陪陪名字")
-            .setPlaceholder("例如：🧚‍♀️ 陪陪名字")
+            .setLabel("ðŸ§šâ€â™€ï¸ é™ªé™ªåå­—")
+            .setPlaceholder("ä¾‹å¦‚ï¼šðŸ§šâ€â™€ï¸ é™ªé™ªåå­—")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("type")
-            .setLabel("🧩 单子类型")
-            .setPlaceholder("例如：游戏名字（Valo娱乐/技术/续单）")
+            .setLabel("ðŸ§© å•å­ç±»åž‹")
+            .setPlaceholder("ä¾‹å¦‚ï¼šæ¸¸æˆåå­—ï¼ˆValoå¨±ä¹/æŠ€æœ¯/ç»­å•ï¼‰")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("duration")
-            .setLabel("⏰ 时长")
-            .setPlaceholder("例如： （ 3小时/ 1白单 2夜单 / 11.00pm - 2.00am )")
+            .setLabel("â° æ—¶é•¿")
+            .setPlaceholder("ä¾‹å¦‚ï¼š ï¼ˆ 3å°æ—¶/ 1ç™½å• 2å¤œå• / 11.00pm - 2.00am )")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("amount")
-            .setLabel("💰 金额")
+            .setLabel("ðŸ’° é‡‘é¢")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         )
@@ -707,42 +711,42 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // ---------------------------------------------------------
-    // 打开礼物报备 Modal
+    // æ‰“å¼€ç¤¼ç‰©æŠ¥å¤‡ Modal
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "open_gift_modal") {
       const modal = new ModalBuilder()
         .setCustomId("giftReportForm")
-        .setTitle("🎁 礼物报备");
+        .setTitle("ðŸŽ ç¤¼ç‰©æŠ¥å¤‡");
 
       modal.addComponents(
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("giver")
-            .setLabel("🧑‍💼 老板")
-            .setPlaceholder("🧑‍💼老板名字")
+            .setLabel("ðŸ§‘â€ðŸ’¼ è€æ¿")
+            .setPlaceholder("ðŸ§‘â€ðŸ’¼è€æ¿åå­—")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("receiver")
-            .setLabel("🧚‍♀️ 收礼人")
-            .setPlaceholder("🧚‍♀️陪陪名字")
+            .setLabel("ðŸ§šâ€â™€ï¸ æ”¶ç¤¼äºº")
+            .setPlaceholder("ðŸ§šâ€â™€ï¸é™ªé™ªåå­—")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("gift")
-            .setLabel("🎁 礼物内容")
-            .setPlaceholder("🎁礼物名字")
+            .setLabel("ðŸŽ ç¤¼ç‰©å†…å®¹")
+            .setPlaceholder("ðŸŽç¤¼ç‰©åå­—")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("value")
-            .setLabel("💰 价值/金额 (选填)")
+            .setLabel("ðŸ’° ä»·å€¼/é‡‘é¢ (é€‰å¡«)")
             .setStyle(TextInputStyle.Short)
             .setRequired(false)
         )
@@ -753,36 +757,36 @@ client.on("interactionCreate", async (interaction) => {
     }
 
         // ---------------------------------------------------------
-    // 提交报备 Modal（报备成功）
+    // æäº¤æŠ¥å¤‡ Modalï¼ˆæŠ¥å¤‡æˆåŠŸï¼‰
     // ---------------------------------------------------------
     if (
       interaction.isModalSubmit() &&
       interaction.customId === "reportForm"
     ) {
       try {
-        // 【修复问题 13】添加输入验证
+        // ã€ä¿®å¤é—®é¢˜ 13ã€‘æ·»åŠ è¾“å…¥éªŒè¯
         const boss = validateInput(interaction.fields.getTextInputValue("boss"), 'text', 50);
         const player = validateInput(interaction.fields.getTextInputValue("player"), 'text', 50);
         const type = validateInput(interaction.fields.getTextInputValue("type"), 'text', 50);
         const duration = validateInput(interaction.fields.getTextInputValue("duration"), 'text', 100);
         const amount = parsePrice(interaction.fields.getTextInputValue("amount"));
 
-        // 验证必填字段
+        // éªŒè¯å¿…å¡«å­—æ®µ
         if (!boss || !player || !type || !duration) {
           return await interaction.reply({
-            content: "❌ 所有字段必填且不能为空，请重新提交",
+            content: "âŒ æ‰€æœ‰å­—æ®µå¿…å¡«ä¸”ä¸èƒ½ä¸ºç©ºï¼Œè¯·é‡æ–°æäº¤",
             ephemeral: true
           });
         }
 
         if (amount <= 0) {
           return await interaction.reply({
-            content: "❌ 金额必须大于 0",
+            content: "âŒ é‡‘é¢å¿…é¡»å¤§äºŽ 0",
             ephemeral: true
           });
         }
 
-        // 【修复】先保存到数据库，直接从返回值获取 orderId
+        // ã€ä¿®å¤ã€‘å…ˆä¿å­˜åˆ°æ•°æ®åº“ï¼Œç›´æŽ¥ä»Žè¿”å›žå€¼èŽ·å– orderId
         let orderId = null;
         try {
           const result = await db.addOrder({
@@ -796,106 +800,106 @@ client.on("interactionCreate", async (interaction) => {
             source: "reportForm",
           });
           
-          // 【修复】直接从返回的result中获取orderId
+          // ã€ä¿®å¤ã€‘ç›´æŽ¥ä»Žè¿”å›žçš„resultä¸­èŽ·å–orderId
           orderId = result.id || result.orderId || null;
           
           if (!orderId) {
-            console.error("❌ 数据库返回的orderId为空，返回值:", result);
+            console.error("âŒ æ•°æ®åº“è¿”å›žçš„orderIdä¸ºç©ºï¼Œè¿”å›žå€¼:", result);
             return await interaction.reply({
-              content: "❌ 保存报备失败（无效的订单ID），请稍后重试",
+              content: "âŒ ä¿å­˜æŠ¥å¤‡å¤±è´¥ï¼ˆæ— æ•ˆçš„è®¢å•IDï¼‰ï¼Œè¯·ç¨åŽé‡è¯•",
               ephemeral: true
             });
           }
           
-          console.log(`✅ 报备成功保存，orderId: ${orderId}`);
+          console.log(`âœ… æŠ¥å¤‡æˆåŠŸä¿å­˜ï¼ŒorderId: ${orderId}`);
         } catch (e) {
-          console.error("❌ 保存报备到数据库失败：", e.message);
+          console.error("âŒ ä¿å­˜æŠ¥å¤‡åˆ°æ•°æ®åº“å¤±è´¥ï¼š", e.message);
           return await interaction.reply({
-            content: "❌ 保存报备失败，请稍后重试",
+            content: "âŒ ä¿å­˜æŠ¥å¤‡å¤±è´¥ï¼Œè¯·ç¨åŽé‡è¯•",
             ephemeral: true
           });
         }
 
-      // 📌 报备成功 Embed（粉色治愈风）- 管理员看的完整版本
+      // ðŸ“Œ æŠ¥å¤‡æˆåŠŸ Embedï¼ˆç²‰è‰²æ²»æ„ˆé£Žï¼‰- ç®¡ç†å‘˜çœ‹çš„å®Œæ•´ç‰ˆæœ¬
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("💗 单子报备完成啦～【管理员视图】")
-        .setDescription(`${sep()}\n✨ 此消息包含完整老板信息，仅发送到管理员频道\n${sep()}\n\n📌 **报备信息**`)
+        .setTitle("ðŸ’— å•å­æŠ¥å¤‡å®Œæˆå•¦ï½žã€ç®¡ç†å‘˜è§†å›¾ã€‘")
+        .setDescription(`${sep()}\nâœ¨ æ­¤æ¶ˆæ¯åŒ…å«å®Œæ•´è€æ¿ä¿¡æ¯ï¼Œä»…å‘é€åˆ°ç®¡ç†å‘˜é¢‘é“\n${sep()}\n\nðŸ“Œ **æŠ¥å¤‡ä¿¡æ¯**`)
         .setThumbnail("https://cdn.discordapp.com/attachments/1433987480524165213/1438478692883103804/ChatGPT_Image_20251113_18_40_31.png?ex=691f98ee&is=691e476e&hm=5566b01b0ccd264da9550d82ad30e760a2a80209eaa4884ec0a4ef57e0909189&"
         )
         .addFields(
-          { name: "👤 老板信息", value: `\`\`\`${boss}\`\`\``, inline: false },
-          { name: "🧚‍♀️ 陪玩", value: player, inline: true },
-          { name: "📌 类型", value: type, inline: true },
-          { name: "⏰ 时长", value: duration, inline: true },
-          { name: "💰 金额", value: `**RM ${amount}**`, inline: true },
-          { name: "⌚ 报备时间", value: new Date().toLocaleString('zh-CN'), inline: true },
-          { name: "🔢 单号状态", value: "⏳ 待添加", inline: true }
+          { name: "ðŸ‘¤ è€æ¿ä¿¡æ¯", value: `\`\`\`${boss}\`\`\``, inline: false },
+          { name: "ðŸ§šâ€â™€ï¸ é™ªçŽ©", value: player, inline: true },
+          { name: "ðŸ“Œ ç±»åž‹", value: type, inline: true },
+          { name: "â° æ—¶é•¿", value: duration, inline: true },
+          { name: "ðŸ’° é‡‘é¢", value: `**RM ${amount}**`, inline: true },
+          { name: "âŒš æŠ¥å¤‡æ—¶é—´", value: new Date().toLocaleString('zh-CN'), inline: true },
+          { name: "ðŸ”¢ å•å·çŠ¶æ€", value: "â³ å¾…æ·»åŠ ", inline: true }
         )
-        .setFooter({ text: `陪玩后宫 • 管理员报备视图 💗 | orderId:${orderId}` })
+        .setFooter({ text: `é™ªçŽ©åŽå®« â€¢ ç®¡ç†å‘˜æŠ¥å¤‡è§†å›¾ ðŸ’— | orderId:${orderId}` })
         .setTimestamp();
 
-      // 公共频道看的 embed（隐藏老板名字）
+      // å…¬å…±é¢‘é“çœ‹çš„ embedï¼ˆéšè—è€æ¿åå­—ï¼‰
       const embedForOthers = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("💗 单子报备完成啦～")
-        .setDescription(`${sep()}\n谢谢你的报备，我们会温柔地记录每一单～\n${sep()}\n\n📌 **报备信息**`)
+        .setTitle("ðŸ’— å•å­æŠ¥å¤‡å®Œæˆå•¦ï½ž")
+        .setDescription(`${sep()}\nè°¢è°¢ä½ çš„æŠ¥å¤‡ï¼Œæˆ‘ä»¬ä¼šæ¸©æŸ”åœ°è®°å½•æ¯ä¸€å•ï½ž\n${sep()}\n\nðŸ“Œ **æŠ¥å¤‡ä¿¡æ¯**`)
         .setThumbnail("https://cdn.discordapp.com/attachments/1433987480524165213/1438478692883103804/ChatGPT_Image_20251113_18_40_31.png?ex=691f98ee&is=691e476e&hm=5566b01b0ccd264da9550d82ad30e760a2a80209eaa4884ec0a4ef57e0909189&"
         )
         .addFields(
-          { name: "🔒 老板信息", value: "仅管理员可见", inline: true },
-          { name: "🧚‍♀️ 陪玩", value: player, inline: true },
-          { name: "📌 类型", value: type, inline: true },
-          { name: "⏰ 时长", value: duration, inline: true },
-          { name: "💰 金额", value: `**RM ${amount}**`, inline: true },
-          { name: "⌚ 报备时间", value: new Date().toLocaleString('zh-CN'), inline: true },
-          { name: "🔢 单号状态", value: "⏳ 待添加", inline: true }
+          { name: "ðŸ”’ è€æ¿ä¿¡æ¯", value: "ä»…ç®¡ç†å‘˜å¯è§", inline: true },
+          { name: "ðŸ§šâ€â™€ï¸ é™ªçŽ©", value: player, inline: true },
+          { name: "ðŸ“Œ ç±»åž‹", value: type, inline: true },
+          { name: "â° æ—¶é•¿", value: duration, inline: true },
+          { name: "ðŸ’° é‡‘é¢", value: `**RM ${amount}**`, inline: true },
+          { name: "âŒš æŠ¥å¤‡æ—¶é—´", value: new Date().toLocaleString('zh-CN'), inline: true },
+          { name: "ðŸ”¢ å•å·çŠ¶æ€", value: "â³ å¾…æ·»åŠ ", inline: true }
         )
-        .setFooter({ text: `陪玩后宫 • 谢谢你的一份用心 💗 | orderId:${orderId}` })
+        .setFooter({ text: `é™ªçŽ©åŽå®« â€¢ è°¢è°¢ä½ çš„ä¸€ä»½ç”¨å¿ƒ ðŸ’— | orderId:${orderId}` })
         .setTimestamp();
 
-      // 📱 自动发送到 Telegram（仅第一个群，包含老板名字）
-      const telegramReportMsg = `<b>📌 新的单子报备</b>
-━━━━━━━━━━━━━━━━━━
-<b>👤 老板:</b> ${boss}
-<b>🧚 陪陪:</b> ${player}
-<b>📝 类型:</b> ${type}
-<b>⏰ 时长:</b> ${duration}
-<b>💰 金额:</b> RM ${amount}
-<b>📅 时间:</b> ${new Date().toLocaleString("zh-CN")}
-<b>📦 订单ID:</b> ${orderId}
-━━━━━━━━━━━━━━━━━━`;
+      // ðŸ“± è‡ªåŠ¨å‘é€åˆ° Telegramï¼ˆä»…ç¬¬ä¸€ä¸ªç¾¤ï¼ŒåŒ…å«è€æ¿åå­—ï¼‰
+      const telegramReportMsg = `<b>ðŸ“Œ æ–°çš„å•å­æŠ¥å¤‡</b>
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+<b>ðŸ‘¤ è€æ¿:</b> ${boss}
+<b>ðŸ§š é™ªé™ª:</b> ${player}
+<b>ðŸ“ ç±»åž‹:</b> ${type}
+<b>â° æ—¶é•¿:</b> ${duration}
+<b>ðŸ’° é‡‘é¢:</b> RM ${amount}
+<b>ðŸ“… æ—¶é—´:</b> ${new Date().toLocaleString("zh-CN")}
+<b>ðŸ“¦ è®¢å•ID:</b> ${orderId}
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”`;
       await sendTelegramReport(config.telegramChatId, telegramReportMsg, config.telegramMessageThreadId).catch(() => {});
 
-      // 添加单号按钮（管理员）
+      // æ·»åŠ å•å·æŒ‰é’®ï¼ˆç®¡ç†å‘˜ï¼‰
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("add_order_number")
-          .setLabel("🔢 添加单号")
+          .setLabel("ðŸ”¢ æ·»åŠ å•å·")
           .setStyle(ButtonStyle.Secondary)
       );
 
-      // ✅ 公共频道：统一只发送“隐藏老板”的版本
+      // âœ… å…¬å…±é¢‘é“ï¼šç»Ÿä¸€åªå‘é€â€œéšè—è€æ¿â€çš„ç‰ˆæœ¬
       await interaction.reply({
         embeds: [embedForOthers],
         components: [row],
       });
 
-      // 【新增】自动发送到报备派单频道
+      // ã€æ–°å¢žã€‘è‡ªåŠ¨å‘é€åˆ°æŠ¥å¤‡æ´¾å•é¢‘é“
       try {
         const reportDispatchChannel = interaction.guild.channels.cache.get(REPORT_DISPATCH_CHANNEL_ID) ||
           (await interaction.guild.channels.fetch(REPORT_DISPATCH_CHANNEL_ID).catch(() => null));
         if (reportDispatchChannel && reportDispatchChannel.isTextBased()) {
           await reportDispatchChannel.send({ embeds: [embedForOthers], components: [row] });
-          console.log(`✅ 报备已发送到频道: ${REPORT_DISPATCH_CHANNEL_ID}`);
+          console.log(`âœ… æŠ¥å¤‡å·²å‘é€åˆ°é¢‘é“: ${REPORT_DISPATCH_CHANNEL_ID}`);
         } else {
-          console.warn(`⚠️ 报备派单频道不存在或非文本频道: ${REPORT_DISPATCH_CHANNEL_ID}`);
+          console.warn(`âš ï¸ æŠ¥å¤‡æ´¾å•é¢‘é“ä¸å­˜åœ¨æˆ–éžæ–‡æœ¬é¢‘é“: ${REPORT_DISPATCH_CHANNEL_ID}`);
         }
       } catch (err) {
-        console.error("❌ 发送报备到频道失败：", err.message);
+        console.error("âŒ å‘é€æŠ¥å¤‡åˆ°é¢‘é“å¤±è´¥ï¼š", err.message);
       }
 
-      // ✅ 【禁用】管理员频道：发送包含老板名字的完整版本 - 单子报备不需要发去该频道
+      // âœ… ã€ç¦ç”¨ã€‘ç®¡ç†å‘˜é¢‘é“ï¼šå‘é€åŒ…å«è€æ¿åå­—çš„å®Œæ•´ç‰ˆæœ¬ - å•å­æŠ¥å¤‡ä¸éœ€è¦å‘åŽ»è¯¥é¢‘é“
       // try {
       //   const logChannel =
       //     interaction.guild.channels.cache.get(LOG_CHANNEL_ID) ||
@@ -903,28 +907,28 @@ client.on("interactionCreate", async (interaction) => {
       //   if (logChannel) {
       //     await logChannel.send({ embeds: [embed] });
       //   } else {
-      //     console.warn("⚠️ 日志频道不存在或无法访问");
+      //     console.warn("âš ï¸ æ—¥å¿—é¢‘é“ä¸å­˜åœ¨æˆ–æ— æ³•è®¿é—®");
       //   }
       // } catch (err) {
-      //   console.error("❌ 发送管理员报备 embed 失败：", err.message);
+      //   console.error("âŒ å‘é€ç®¡ç†å‘˜æŠ¥å¤‡ embed å¤±è´¥ï¼š", err.message);
       // }
 
       return;
       } catch (err) {
-        console.error("❌ 处理报备 Modal 出错:", err.message);
+        console.error("âŒ å¤„ç†æŠ¥å¤‡ Modal å‡ºé”™:", err.message);
         try {
           await interaction.reply({
-            content: "❌ 处理报备时发生错误，请稍后重试",
+            content: "âŒ å¤„ç†æŠ¥å¤‡æ—¶å‘ç”Ÿé”™è¯¯ï¼Œè¯·ç¨åŽé‡è¯•",
             ephemeral: true
           });
         } catch (e) {
-          console.error("❌ 回复用户失败:", e.message);
+          console.error("âŒ å›žå¤ç”¨æˆ·å¤±è´¥:", e.message);
         }
       }
     }
 
      // ---------------------------------------------------------
-    // 提交礼物报备 Modal（报备成功）
+    // æäº¤ç¤¼ç‰©æŠ¥å¤‡ Modalï¼ˆæŠ¥å¤‡æˆåŠŸï¼‰
     // ---------------------------------------------------------
     if (
       interaction.isModalSubmit() &&
@@ -935,7 +939,7 @@ client.on("interactionCreate", async (interaction) => {
       const gift = interaction.fields.getTextInputValue("gift");
       const value = parsePrice(interaction.fields.getTextInputValue("value") || 0);
 
-      // 保存到数据库，获取 orderId
+      // ä¿å­˜åˆ°æ•°æ®åº“ï¼ŒèŽ·å– orderId
       let orderId = null;
       try {
         const result = await db.addOrder({
@@ -952,81 +956,81 @@ client.on("interactionCreate", async (interaction) => {
         orderId = result.id || result.orderId || null;
         
         if (!orderId) {
-          console.error("❌ 数据库返回的orderId为空，返回值:", result);
+          console.error("âŒ æ•°æ®åº“è¿”å›žçš„orderIdä¸ºç©ºï¼Œè¿”å›žå€¼:", result);
           return await interaction.reply({
-            content: "❌ 保存礼物报备失败（无效的订单ID），请稍后重试",
+            content: "âŒ ä¿å­˜ç¤¼ç‰©æŠ¥å¤‡å¤±è´¥ï¼ˆæ— æ•ˆçš„è®¢å•IDï¼‰ï¼Œè¯·ç¨åŽé‡è¯•",
             ephemeral: true
           });
         }
         
-        console.log(`✅ 礼物报备成功保存，orderId: ${orderId}`);
+        console.log(`âœ… ç¤¼ç‰©æŠ¥å¤‡æˆåŠŸä¿å­˜ï¼ŒorderId: ${orderId}`);
       } catch (e) {
-        console.error("❌ 保存礼物报备到数据库失败：", e.message);
+        console.error("âŒ ä¿å­˜ç¤¼ç‰©æŠ¥å¤‡åˆ°æ•°æ®åº“å¤±è´¥ï¼š", e.message);
         return await interaction.reply({
-          content: "❌ 保存礼物报备失败，请稍后重试",
+          content: "âŒ ä¿å­˜ç¤¼ç‰©æŠ¥å¤‡å¤±è´¥ï¼Œè¯·ç¨åŽé‡è¯•",
           ephemeral: true
         });
       }
 
-      // 管理员专用 embed（包含送礼人）
+      // ç®¡ç†å‘˜ä¸“ç”¨ embedï¼ˆåŒ…å«é€ç¤¼äººï¼‰
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("🎁 礼物报备完成啦～（管理员视图）")
-        .setDescription(`${sep()}\n此消息仅发送到管理员频道，包含完整送礼人信息～\n${sep()}`)
+        .setTitle("ðŸŽ ç¤¼ç‰©æŠ¥å¤‡å®Œæˆå•¦ï½žï¼ˆç®¡ç†å‘˜è§†å›¾ï¼‰")
+        .setDescription(`${sep()}\næ­¤æ¶ˆæ¯ä»…å‘é€åˆ°ç®¡ç†å‘˜é¢‘é“ï¼ŒåŒ…å«å®Œæ•´é€ç¤¼äººä¿¡æ¯ï½ž\n${sep()}`)
         .setThumbnail("https://cdn.discordapp.com/attachments/1433987480524165213/1438478692883103804/ChatGPT_Image_20251113_18_40_31.png?ex=691f98ee&is=691e476e&hm=5566b01b0ccd264da9550d82ad30e760a2a80209eaa4884ec0a4ef57e0909189&")
         .addFields(
-          { name: "🧑‍💼 送礼人", value: giver, inline: true },
-          { name: "🧚‍♀️ 收礼人", value: receiver, inline: true },
-          { name: "🎁 礼物", value: gift, inline: true },
-          { name: "💰 价值", value: `RM ${value}`, inline: true },
-          { name: "🔢 单号", value: "未填写", inline: false }
+          { name: "ðŸ§‘â€ðŸ’¼ é€ç¤¼äºº", value: giver, inline: true },
+          { name: "ðŸ§šâ€â™€ï¸ æ”¶ç¤¼äºº", value: receiver, inline: true },
+          { name: "ðŸŽ ç¤¼ç‰©", value: gift, inline: true },
+          { name: "ðŸ’° ä»·å€¼", value: `RM ${value}`, inline: true },
+          { name: "ðŸ”¢ å•å·", value: "æœªå¡«å†™", inline: false }
         )
-        .setFooter({ text: `陪玩后宫 • 管理员专用礼物报备视图 💗 | orderId:${orderId}` })
+        .setFooter({ text: `é™ªçŽ©åŽå®« â€¢ ç®¡ç†å‘˜ä¸“ç”¨ç¤¼ç‰©æŠ¥å¤‡è§†å›¾ ðŸ’— | orderId:${orderId}` })
         .setTimestamp();
 
-      // 给普通用户看的embed（隐藏送礼人名字）
+      // ç»™æ™®é€šç”¨æˆ·çœ‹çš„embedï¼ˆéšè—é€ç¤¼äººåå­—ï¼‰
       const embedForOthers = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("🎁 礼物报备完成啦～")
-        .setDescription(`${sep()}\n谢谢你的报备，我们会温柔地记录每一份礼物～\n${sep()}`)
+        .setTitle("ðŸŽ ç¤¼ç‰©æŠ¥å¤‡å®Œæˆå•¦ï½ž")
+        .setDescription(`${sep()}\nè°¢è°¢ä½ çš„æŠ¥å¤‡ï¼Œæˆ‘ä»¬ä¼šæ¸©æŸ”åœ°è®°å½•æ¯ä¸€ä»½ç¤¼ç‰©ï½ž\n${sep()}`)
         .setThumbnail("https://cdn.discordapp.com/attachments/1433987480524165213/1438478692883103804/ChatGPT_Image_20251113_18_40_31.png?ex=691f98ee&is=691e476e&hm=5566b01b0ccd264da9550d82ad30e760a2a80209eaa4884ec0a4ef57e0909189&")
         .addFields(
-          { name: "🧑‍💼 送礼人", value: "🔒 仅管理员可见", inline: true },
-          { name: "🧚‍♀️ 收礼人", value: receiver, inline: true },
-          { name: "🎁 礼物", value: gift, inline: true },
-          { name: "💰 价值", value: `RM ${value}`, inline: true },
-          { name: "🔢 单号", value: "未填写", inline: false }
+          { name: "ðŸ§‘â€ðŸ’¼ é€ç¤¼äºº", value: "ðŸ”’ ä»…ç®¡ç†å‘˜å¯è§", inline: true },
+          { name: "ðŸ§šâ€â™€ï¸ æ”¶ç¤¼äºº", value: receiver, inline: true },
+          { name: "ðŸŽ ç¤¼ç‰©", value: gift, inline: true },
+          { name: "ðŸ’° ä»·å€¼", value: `RM ${value}`, inline: true },
+          { name: "ðŸ”¢ å•å·", value: "æœªå¡«å†™", inline: false }
         )
-        .setFooter({ text: `陪玩后宫 • 谢谢你的一份用心 💗 | orderId:${orderId}` })
+        .setFooter({ text: `é™ªçŽ©åŽå®« â€¢ è°¢è°¢ä½ çš„ä¸€ä»½ç”¨å¿ƒ ðŸ’— | orderId:${orderId}` })
         .setTimestamp();
 
-      // 📱 自动发送到 Telegram（包含送礼人）
-      const telegramGiftMsg = `<b>🎁 新的礼物报备</b>
-━━━━━━━━━━━━━━━━━━
-<b>👤 送礼人:</b> ${giver}
-<b>🧚 收礼人:</b> ${receiver}
-<b>🎁 礼物:</b> ${gift}
-<b>💰 价值:</b> RM ${value}
-<b>📅 时间:</b> ${new Date().toLocaleString("zh-CN")}
-<b>📦 订单ID:</b> ${orderId}
-━━━━━━━━━━━━━━━━━━`;
+      // ðŸ“± è‡ªåŠ¨å‘é€åˆ° Telegramï¼ˆåŒ…å«é€ç¤¼äººï¼‰
+      const telegramGiftMsg = `<b>ðŸŽ æ–°çš„ç¤¼ç‰©æŠ¥å¤‡</b>
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+<b>ðŸ‘¤ é€ç¤¼äºº:</b> ${giver}
+<b>ðŸ§š æ”¶ç¤¼äºº:</b> ${receiver}
+<b>ðŸŽ ç¤¼ç‰©:</b> ${gift}
+<b>ðŸ’° ä»·å€¼:</b> RM ${value}
+<b>ðŸ“… æ—¶é—´:</b> ${new Date().toLocaleString("zh-CN")}
+<b>ðŸ“¦ è®¢å•ID:</b> ${orderId}
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”`;
       await sendTelegramReport(config.telegramChatId, telegramGiftMsg, config.telegramMessageThreadId).catch(() => {});
 
-      // 添加单号按钮（管理员）
+      // æ·»åŠ å•å·æŒ‰é’®ï¼ˆç®¡ç†å‘˜ï¼‰
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("add_order_number")
-          .setLabel("🔢 添加单号")
+          .setLabel("ðŸ”¢ æ·»åŠ å•å·")
           .setStyle(ButtonStyle.Secondary)
       );
 
-      // ✅ 公共频道：只显示“送礼人：🔒 仅管理员可见”
+      // âœ… å…¬å…±é¢‘é“ï¼šåªæ˜¾ç¤ºâ€œé€ç¤¼äººï¼šðŸ”’ ä»…ç®¡ç†å‘˜å¯è§â€
       await interaction.reply({
         embeds: [embedForOthers],
         components: [row],
       });
 
-      // ✅ 【禁用】管理员频道：发送完整信息的 embed - 单子报备不需要发去该频道
+      // âœ… ã€ç¦ç”¨ã€‘ç®¡ç†å‘˜é¢‘é“ï¼šå‘é€å®Œæ•´ä¿¡æ¯çš„ embed - å•å­æŠ¥å¤‡ä¸éœ€è¦å‘åŽ»è¯¥é¢‘é“
       // try {
       //   const logChannel =
       //     interaction.guild.channels.cache.get(LOG_CHANNEL_ID) ||
@@ -1035,58 +1039,58 @@ client.on("interactionCreate", async (interaction) => {
       //     await logChannel.send({ embeds: [embed] });
       //   }
       // } catch (err) {
-      //   console.error("发送管理员礼物报备 embed 失败：", err);
+      //   console.error("å‘é€ç®¡ç†å‘˜ç¤¼ç‰©æŠ¥å¤‡ embed å¤±è´¥ï¼š", err);
       // }
 
       return;
     }
 
     // ---------------------------------------------------------
-    // 打开续单报备 Modal
+    // æ‰“å¼€ç»­å•æŠ¥å¤‡ Modal
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "open_renew_report_modal") {
       const modal = new ModalBuilder()
         .setCustomId("renewReportForm")
-        .setTitle("🔄 续单报备");
+        .setTitle("ðŸ”„ ç»­å•æŠ¥å¤‡");
 
       modal.addComponents(
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("boss")
-            .setLabel("🧑‍💼 老板名字")
-            .setPlaceholder("例如：老板编号#1234")
+            .setLabel("ðŸ§‘â€ðŸ’¼ è€æ¿åå­—")
+            .setPlaceholder("ä¾‹å¦‚ï¼šè€æ¿ç¼–å·#1234")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("player")
-            .setLabel("🧚‍♀️ 陪陪名字")
-            .setPlaceholder("例如：小雪 / 小布丁")
+            .setLabel("ðŸ§šâ€â™€ï¸ é™ªé™ªåå­—")
+            .setPlaceholder("ä¾‹å¦‚ï¼šå°é›ª / å°å¸ƒä¸")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("order_no")
-            .setLabel("📦 原单号")
-            .setPlaceholder("例如：ORD20251215001")
+            .setLabel("ðŸ“¦ åŽŸå•å·")
+            .setPlaceholder("ä¾‹å¦‚ï¼šORD20251215001")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("duration")
-            .setLabel("⏰ 时长")
-            .setPlaceholder("例如：2小时 / 3局 / 11.00pm - 2.00am")
+            .setLabel("â° æ—¶é•¿")
+            .setPlaceholder("ä¾‹å¦‚ï¼š2å°æ—¶ / 3å±€ / 11.00pm - 2.00am")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("amount")
-            .setLabel("💰 金额")
-            .setPlaceholder("例如：40")
+            .setLabel("ðŸ’° é‡‘é¢")
+            .setPlaceholder("ä¾‹å¦‚ï¼š40")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         )
@@ -1097,7 +1101,7 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // ---------------------------------------------------------
-    // 提交续单报备 Modal（续单报备成功）
+    // æäº¤ç»­å•æŠ¥å¤‡ Modalï¼ˆç»­å•æŠ¥å¤‡æˆåŠŸï¼‰
     // ---------------------------------------------------------
     if (
       interaction.isModalSubmit() &&
@@ -1109,14 +1113,14 @@ client.on("interactionCreate", async (interaction) => {
       const duration = interaction.fields.getTextInputValue("duration");
       const amount = parsePrice(interaction.fields.getTextInputValue("amount"));
 
-      // 保存到数据库，获取 orderId
+      // ä¿å­˜åˆ°æ•°æ®åº“ï¼ŒèŽ·å– orderId
       let orderId = null;
       try {
         const result = await db.addOrder({
           type: "renew_report",
           boss,
           player,
-          orderType: "续单",
+          orderType: "ç»­å•",
           duration,
           amount,
           date: new Date().toLocaleString("zh-CN"),
@@ -1126,86 +1130,86 @@ client.on("interactionCreate", async (interaction) => {
         orderId = result.id || result.orderId || null;
         
         if (!orderId) {
-          console.error("❌ 数据库返回的orderId为空，返回值:", result);
+          console.error("âŒ æ•°æ®åº“è¿”å›žçš„orderIdä¸ºç©ºï¼Œè¿”å›žå€¼:", result);
           return await interaction.reply({
-            content: "❌ 保存续单报备失败（无效的订单ID），请稍后重试",
+            content: "âŒ ä¿å­˜ç»­å•æŠ¥å¤‡å¤±è´¥ï¼ˆæ— æ•ˆçš„è®¢å•IDï¼‰ï¼Œè¯·ç¨åŽé‡è¯•",
             ephemeral: true
           });
         }
         
-        console.log(`✅ 续单报备成功保存，orderId: ${orderId}`);
+        console.log(`âœ… ç»­å•æŠ¥å¤‡æˆåŠŸä¿å­˜ï¼ŒorderId: ${orderId}`);
       } catch (e) {
-        console.error("❌ 保存续单报备到数据库失败：", e.message);
+        console.error("âŒ ä¿å­˜ç»­å•æŠ¥å¤‡åˆ°æ•°æ®åº“å¤±è´¥ï¼š", e.message);
         return await interaction.reply({
-          content: "❌ 保存续单报备失败，请稍后重试",
+          content: "âŒ ä¿å­˜ç»­å•æŠ¥å¤‡å¤±è´¥ï¼Œè¯·ç¨åŽé‡è¯•",
           ephemeral: true
         });
       }
 
-      // 📌 续单报备成功 Embed（粉色治愈风）- 管理员看的完整版本
+      // ðŸ“Œ ç»­å•æŠ¥å¤‡æˆåŠŸ Embedï¼ˆç²‰è‰²æ²»æ„ˆé£Žï¼‰- ç®¡ç†å‘˜çœ‹çš„å®Œæ•´ç‰ˆæœ¬
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("🔄 续单报备完成啦～【管理员视图】")
-        .setDescription(`${sep()}\n✨ 此消息包含完整老板信息，仅发送到管理员频道\n${sep()}\n\n📌 **续单信息**`)
+        .setTitle("ðŸ”„ ç»­å•æŠ¥å¤‡å®Œæˆå•¦ï½žã€ç®¡ç†å‘˜è§†å›¾ã€‘")
+        .setDescription(`${sep()}\nâœ¨ æ­¤æ¶ˆæ¯åŒ…å«å®Œæ•´è€æ¿ä¿¡æ¯ï¼Œä»…å‘é€åˆ°ç®¡ç†å‘˜é¢‘é“\n${sep()}\n\nðŸ“Œ **ç»­å•ä¿¡æ¯**`)
         .setThumbnail("https://cdn.discordapp.com/attachments/1433987480524165213/1438478692883103804/ChatGPT_Image_20251113_18_40_31.png?ex=691f98ee&is=691e476e&hm=5566b01b0ccd264da9550d82ad30e760a2a80209eaa4884ec0a4ef57e0909189&")
         .addFields(
-          { name: "👤 老板信息", value: `\`\`\`${boss}\`\`\``, inline: false },
-          { name: "🧚‍♀️ 陪玩", value: player, inline: true },
-          { name: "⏰ 时长", value: duration, inline: true },
-          { name: "💰 金额", value: `**RM ${amount}**`, inline: true },
-          { name: "📦 原单号", value: `\`${orderNo}\``, inline: true },
-          { name: "⌚ 续单时间", value: new Date().toLocaleString('zh-CN'), inline: true },
-          { name: "🔢 新单号状态", value: "⏳ 待添加", inline: true }
+          { name: "ðŸ‘¤ è€æ¿ä¿¡æ¯", value: `\`\`\`${boss}\`\`\``, inline: false },
+          { name: "ðŸ§šâ€â™€ï¸ é™ªçŽ©", value: player, inline: true },
+          { name: "â° æ—¶é•¿", value: duration, inline: true },
+          { name: "ðŸ’° é‡‘é¢", value: `**RM ${amount}**`, inline: true },
+          { name: "ðŸ“¦ åŽŸå•å·", value: `\`${orderNo}\``, inline: true },
+          { name: "âŒš ç»­å•æ—¶é—´", value: new Date().toLocaleString('zh-CN'), inline: true },
+          { name: "ðŸ”¢ æ–°å•å·çŠ¶æ€", value: "â³ å¾…æ·»åŠ ", inline: true }
         )
-        .setFooter({ text: `陪玩后宫 • 续单报备视图 💗 | orderId:${orderId}` })
+        .setFooter({ text: `é™ªçŽ©åŽå®« â€¢ ç»­å•æŠ¥å¤‡è§†å›¾ ðŸ’— | orderId:${orderId}` })
         .setTimestamp();
 
-      // 公共频道看的 embed（隐藏老板名字）
+      // å…¬å…±é¢‘é“çœ‹çš„ embedï¼ˆéšè—è€æ¿åå­—ï¼‰
       const embedForOthers = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("🔄 续单报备完成啦～")
-        .setDescription(`${sep()}\n谢谢你的报备，我们会温柔地记录每一单～\n${sep()}\n\n📌 **续单信息**`)
+        .setTitle("ðŸ”„ ç»­å•æŠ¥å¤‡å®Œæˆå•¦ï½ž")
+        .setDescription(`${sep()}\nè°¢è°¢ä½ çš„æŠ¥å¤‡ï¼Œæˆ‘ä»¬ä¼šæ¸©æŸ”åœ°è®°å½•æ¯ä¸€å•ï½ž\n${sep()}\n\nðŸ“Œ **ç»­å•ä¿¡æ¯**`)
         .setThumbnail("https://cdn.discordapp.com/attachments/1433987480524165213/1438478692883103804/ChatGPT_Image_20251113_18_40_31.png?ex=691f98ee&is=691e476e&hm=5566b01b0ccd264da9550d82ad30e760a2a80209eaa4884ec0a4ef57e0909189&")
         .addFields(
-          { name: "🔒 老板信息", value: "仅管理员可见", inline: true },
-          { name: "🧚‍♀️ 陪玩", value: player, inline: true },
-          { name: "⏰ 时长", value: duration, inline: true },
-          { name: "💰 金额", value: `**RM ${amount}**`, inline: true },
-          { name: "📦 原单号", value: `\`${orderNo}\``, inline: true },
-          { name: "⌚ 续单时间", value: new Date().toLocaleString('zh-CN'), inline: true },
-          { name: "🔢 新单号状态", value: "⏳ 待添加", inline: true }
+          { name: "ðŸ”’ è€æ¿ä¿¡æ¯", value: "ä»…ç®¡ç†å‘˜å¯è§", inline: true },
+          { name: "ðŸ§šâ€â™€ï¸ é™ªçŽ©", value: player, inline: true },
+          { name: "â° æ—¶é•¿", value: duration, inline: true },
+          { name: "ðŸ’° é‡‘é¢", value: `**RM ${amount}**`, inline: true },
+          { name: "ðŸ“¦ åŽŸå•å·", value: `\`${orderNo}\``, inline: true },
+          { name: "âŒš ç»­å•æ—¶é—´", value: new Date().toLocaleString('zh-CN'), inline: true },
+          { name: "ðŸ”¢ æ–°å•å·çŠ¶æ€", value: "â³ å¾…æ·»åŠ ", inline: true }
         )
-        .setFooter({ text: `陪玩后宫 • 谢谢你的一份用心 💗 | orderId:${orderId}` })
+        .setFooter({ text: `é™ªçŽ©åŽå®« â€¢ è°¢è°¢ä½ çš„ä¸€ä»½ç”¨å¿ƒ ðŸ’— | orderId:${orderId}` })
         .setTimestamp();
 
-      // 📱 自动发送到 Telegram（仅第一个群，包含老板名字）
-      const telegramRenewReportMsg = `<b>🔄 新的续单报备</b>
-━━━━━━━━━━━━━━━━━━
-<b>👤 老板:</b> ${boss}
-<b>🧚 陪陪:</b> ${player}
-<b>📦 原单号:</b> ${orderNo}
-<b>⏰ 时长:</b> ${duration}
-<b>💰 金额:</b> RM ${amount}
-<b>📅 时间:</b> ${new Date().toLocaleString("zh-CN")}
-<b>📦 订单ID:</b> ${orderId}
-━━━━━━━━━━━━━━━━━━`;
+      // ðŸ“± è‡ªåŠ¨å‘é€åˆ° Telegramï¼ˆä»…ç¬¬ä¸€ä¸ªç¾¤ï¼ŒåŒ…å«è€æ¿åå­—ï¼‰
+      const telegramRenewReportMsg = `<b>ðŸ”„ æ–°çš„ç»­å•æŠ¥å¤‡</b>
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+<b>ðŸ‘¤ è€æ¿:</b> ${boss}
+<b>ðŸ§š é™ªé™ª:</b> ${player}
+<b>ðŸ“¦ åŽŸå•å·:</b> ${orderNo}
+<b>â° æ—¶é•¿:</b> ${duration}
+<b>ðŸ’° é‡‘é¢:</b> RM ${amount}
+<b>ðŸ“… æ—¶é—´:</b> ${new Date().toLocaleString("zh-CN")}
+<b>ðŸ“¦ è®¢å•ID:</b> ${orderId}
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”`;
       await sendTelegramReport(config.telegramChatId, telegramRenewReportMsg, config.telegramMessageThreadId).catch(() => {});
 
-      // 添加单号按钮（管理员）
+      // æ·»åŠ å•å·æŒ‰é’®ï¼ˆç®¡ç†å‘˜ï¼‰
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("add_order_number")
-          .setLabel("🔢 添加新单号")
+          .setLabel("ðŸ”¢ æ·»åŠ æ–°å•å·")
           .setStyle(ButtonStyle.Secondary)
       );
 
-      // ✅ 公共频道：统一只发送"隐藏老板"的版本
+      // âœ… å…¬å…±é¢‘é“ï¼šç»Ÿä¸€åªå‘é€"éšè—è€æ¿"çš„ç‰ˆæœ¬
       await interaction.reply({
         embeds: [embedForOthers],
         components: [row],
       });
 
-      // ✅ 【禁用】管理员频道：发送包含老板名字的完整版本 - 单子报备不需要发去该频道
+      // âœ… ã€ç¦ç”¨ã€‘ç®¡ç†å‘˜é¢‘é“ï¼šå‘é€åŒ…å«è€æ¿åå­—çš„å®Œæ•´ç‰ˆæœ¬ - å•å­æŠ¥å¤‡ä¸éœ€è¦å‘åŽ»è¯¥é¢‘é“
       // try {
       //   const logChannel =
       //     interaction.guild.channels.cache.get(LOG_CHANNEL_ID) ||
@@ -1214,7 +1218,7 @@ client.on("interactionCreate", async (interaction) => {
       //     await logChannel.send({ embeds: [embed] });
       //   }
       // } catch (err) {
-      //   console.error("发送管理员续单报备 embed 失败：", err);
+      //   console.error("å‘é€ç®¡ç†å‘˜ç»­å•æŠ¥å¤‡ embed å¤±è´¥ï¼š", err);
       // }
 
       return;
@@ -1222,7 +1226,7 @@ client.on("interactionCreate", async (interaction) => {
 
 
     // ---------------------------------------------------------
-    // 添加单号按钮（管理员限定）
+    // æ·»åŠ å•å·æŒ‰é’®ï¼ˆç®¡ç†å‘˜é™å®šï¼‰
     // ---------------------------------------------------------
     if (
       interaction.isButton() &&
@@ -1230,35 +1234,35 @@ client.on("interactionCreate", async (interaction) => {
     ) {
       const member = interaction.guild.members.cache.get(interaction.user.id);
 
-      // 权限验证
+      // æƒé™éªŒè¯
       if (
         !member.permissions.has(PermissionFlagsBits.Administrator) &&
         !member.roles.cache.has(config.adminRoleId)
       ) {
         return interaction.reply({
-          content: "❌ 抱歉，只有管理员可以添加单号。若你需要帮助请联系管理员～",
+          content: "âŒ æŠ±æ­‰ï¼Œåªæœ‰ç®¡ç†å‘˜å¯ä»¥æ·»åŠ å•å·ã€‚è‹¥ä½ éœ€è¦å¸®åŠ©è¯·è”ç³»ç®¡ç†å‘˜ï½ž",
           ephemeral: true,
         });
       }
 
-      // 记录消息 ID，用于提交 modal 后编辑 embed
+      // è®°å½•æ¶ˆæ¯ IDï¼Œç”¨äºŽæäº¤ modal åŽç¼–è¾‘ embed
       addOrderContext.set(interaction.user.id, {
         guildId: interaction.guild.id,
         channelId: interaction.channel.id,
         messageId: interaction.message.id,
       });
       
-      // 【修复问题 8】添加自动清理机制（5分钟后清理）
+      // ã€ä¿®å¤é—®é¢˜ 8ã€‘æ·»åŠ è‡ªåŠ¨æ¸…ç†æœºåˆ¶ï¼ˆ5åˆ†é’ŸåŽæ¸…ç†ï¼‰
       addOrderContextCleanup(interaction.user.id, 300000);
 
-      // 打开 Modal
+      // æ‰“å¼€ Modal
       const modal = new ModalBuilder()
         .setCustomId("addOrderNumberModal")
-        .setTitle("🔢 添加单号");
+        .setTitle("ðŸ”¢ æ·»åŠ å•å·");
 
       const input = new TextInputBuilder()
         .setCustomId("order_number")
-        .setLabel("请输入单号")
+        .setLabel("è¯·è¾“å…¥å•å·")
         .setStyle(TextInputStyle.Short)
         .setRequired(true);
 
@@ -1269,7 +1273,7 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // ---------------------------------------------------------
-    // 单号 Modal 提交（更新原消息）
+    // å•å· Modal æäº¤ï¼ˆæ›´æ–°åŽŸæ¶ˆæ¯ï¼‰
     // ---------------------------------------------------------
     if (
       interaction.isModalSubmit() &&
@@ -1280,7 +1284,7 @@ client.on("interactionCreate", async (interaction) => {
       const ctx = addOrderContext.get(interaction.user.id);
       if (!ctx) {
         return interaction.reply({
-          content: "❌ 找不到对应的报备消息（可能已过期）。请重试或联系管理员～",
+          content: "âŒ æ‰¾ä¸åˆ°å¯¹åº”çš„æŠ¥å¤‡æ¶ˆæ¯ï¼ˆå¯èƒ½å·²è¿‡æœŸï¼‰ã€‚è¯·é‡è¯•æˆ–è”ç³»ç®¡ç†å‘˜ï½ž",
           ephemeral: true,
         });
       }
@@ -1290,7 +1294,7 @@ client.on("interactionCreate", async (interaction) => {
         (await client.guilds.fetch(ctx.guildId).catch(() => null));
       if (!guild)
         return interaction.reply({
-          content: "❌ 无法找到公会，请确认机器人权限。",
+          content: "âŒ æ— æ³•æ‰¾åˆ°å…¬ä¼šï¼Œè¯·ç¡®è®¤æœºå™¨äººæƒé™ã€‚",
           ephemeral: true,
         });
 
@@ -1299,67 +1303,67 @@ client.on("interactionCreate", async (interaction) => {
         (await guild.channels.fetch(ctx.channelId).catch(() => null));
       if (!channel)
         return interaction.reply({
-          content: "❌ 无法找到原频道，消息可能已被删除。",
+          content: "âŒ æ— æ³•æ‰¾åˆ°åŽŸé¢‘é“ï¼Œæ¶ˆæ¯å¯èƒ½å·²è¢«åˆ é™¤ã€‚",
           ephemeral: true,
         });
 
       const msg = await channel.messages.fetch(ctx.messageId).catch(() => null);
       if (!msg)
         return interaction.reply({
-          content: "❌ 原始消息已不存在。",
+          content: "âŒ åŽŸå§‹æ¶ˆæ¯å·²ä¸å­˜åœ¨ã€‚",
           ephemeral: true,
         });
 
       const oldEmbed = msg.embeds[0];
       if (!oldEmbed) {
-        console.error("❌ [addOrderNumberModal] 原始 embed 不存在");
+        console.error("âŒ [addOrderNumberModal] åŽŸå§‹ embed ä¸å­˜åœ¨");
         return interaction.reply({
-          content: "❌ 原始 embed 不存在。",
+          content: "âŒ åŽŸå§‹ embed ä¸å­˜åœ¨ã€‚",
           ephemeral: true,
         });
       }
 
-      // 【修复】从 Embed footer 中解析 orderId，而不是盲目猜测
+      // ã€ä¿®å¤ã€‘ä»Ž Embed footer ä¸­è§£æž orderIdï¼Œè€Œä¸æ˜¯ç›²ç›®çŒœæµ‹
       const footerText = oldEmbed.footer?.text || "";
-      console.log(`📝 [addOrderNumberModal] Footer 文本: "${footerText}"`);
+      console.log(`ðŸ“ [addOrderNumberModal] Footer æ–‡æœ¬: "${footerText}"`);
       
-      // 支持两种格式：orderId: 和 ID:（兼容旧版本）
+      // æ”¯æŒä¸¤ç§æ ¼å¼ï¼šorderId: å’Œ ID:ï¼ˆå…¼å®¹æ—§ç‰ˆæœ¬ï¼‰
       let orderIdMatch = footerText.match(/orderId:(\d+)/);
       let orderId = orderIdMatch ? parseInt(orderIdMatch[1]) : null;
       
-      // 如果找不到新格式，尝试旧格式 ID: 并为其补充 orderId
+      // å¦‚æžœæ‰¾ä¸åˆ°æ–°æ ¼å¼ï¼Œå°è¯•æ—§æ ¼å¼ ID: å¹¶ä¸ºå…¶è¡¥å…… orderId
       if (!orderId) {
         const oldIdMatch = footerText.match(/ID:(\d+)/);
         orderId = oldIdMatch ? parseInt(oldIdMatch[1]) : null;
         if (orderId) {
-          console.warn(`⚠️ [addOrderNumberModal] 检测到旧版本 footer 格式，orderId: ${orderId}`);
+          console.warn(`âš ï¸ [addOrderNumberModal] æ£€æµ‹åˆ°æ—§ç‰ˆæœ¬ footer æ ¼å¼ï¼ŒorderId: ${orderId}`);
         }
       }
 
       if (!orderId) {
-        console.error(`❌ [addOrderNumberModal] 无法从 footer 中提取 orderId，footer: "${footerText}"`);
-        console.error(`❌ [addOrderNumberModal] 消息ID: ${ctx.messageId}, 频道ID: ${ctx.channelId}`);
+        console.error(`âŒ [addOrderNumberModal] æ— æ³•ä»Ž footer ä¸­æå– orderIdï¼Œfooter: "${footerText}"`);
+        console.error(`âŒ [addOrderNumberModal] æ¶ˆæ¯ID: ${ctx.messageId}, é¢‘é“ID: ${ctx.channelId}`);
         return interaction.reply({
-          content: "❌ 无法从报备记录中提取订单 ID，可能是旧版本记录。请联系管理员重新报备。",
+          content: "âŒ æ— æ³•ä»ŽæŠ¥å¤‡è®°å½•ä¸­æå–è®¢å• IDï¼Œå¯èƒ½æ˜¯æ—§ç‰ˆæœ¬è®°å½•ã€‚è¯·è”ç³»ç®¡ç†å‘˜é‡æ–°æŠ¥å¤‡ã€‚",
           ephemeral: true,
         });
       }
       
-      console.log(`✅ [addOrderNumberModal] 成功提取 orderId: ${orderId}`);
+      console.log(`âœ… [addOrderNumberModal] æˆåŠŸæå– orderId: ${orderId}`);
 
-      // 创建新 embed（移除旧单号、单号状态 & 加入新单号和已添加状态）
+      // åˆ›å»ºæ–° embedï¼ˆç§»é™¤æ—§å•å·ã€å•å·çŠ¶æ€ & åŠ å…¥æ–°å•å·å’Œå·²æ·»åŠ çŠ¶æ€ï¼‰
       const newEmbed = EmbedBuilder.from(oldEmbed);
       const filtered = (oldEmbed.fields || []).filter(
-        (f) => f.name !== "🔢 单号" && f.name !== "🔢 单号状态" && f.name !== "🔢 新单号状态"
+        (f) => f.name !== "ðŸ”¢ å•å·" && f.name !== "ðŸ”¢ å•å·çŠ¶æ€" && f.name !== "ðŸ”¢ æ–°å•å·çŠ¶æ€"
       );
       newEmbed.setFields(filtered);
       newEmbed.addFields({
-        name: "🔢 单号",
+        name: "ðŸ”¢ å•å·",
         value: orderNumber,
       });
       newEmbed.addFields({
-        name: "🔢 单号状态",
-        value: "✅ 已添加",
+        name: "ðŸ”¢ å•å·çŠ¶æ€",
+        value: "âœ… å·²æ·»åŠ ",
         inline: true,
       });
 
@@ -1368,135 +1372,135 @@ client.on("interactionCreate", async (interaction) => {
         components: msg.components,
       });
 
-      // 【修复】使用从footer解析的orderId直接更新数据库
+      // ã€ä¿®å¤ã€‘ä½¿ç”¨ä»Žfooterè§£æžçš„orderIdç›´æŽ¥æ›´æ–°æ•°æ®åº“
       let updatedOrderInfo = null;
       try {
-        // 【修复】允许重用已存在的单号 - 用户可使用任何单号，不限制唯一性
-        console.log(`📊 [addOrderNumberModal] 正在更新 orderId:${orderId} 的订单号为 ${orderNumber}`);
+        // ã€ä¿®å¤ã€‘å…è®¸é‡ç”¨å·²å­˜åœ¨çš„å•å· - ç”¨æˆ·å¯ä½¿ç”¨ä»»ä½•å•å·ï¼Œä¸é™åˆ¶å”¯ä¸€æ€§
+        console.log(`ðŸ“Š [addOrderNumberModal] æ­£åœ¨æ›´æ–° orderId:${orderId} çš„è®¢å•å·ä¸º ${orderNumber}`);
         db.updateOrderNumber(orderId, orderNumber);
         updatedOrderInfo = db.getOrderById(orderId);
-        console.log(`✅ [addOrderNumberModal] 订单号更新成功，updated info:`, updatedOrderInfo);
+        console.log(`âœ… [addOrderNumberModal] è®¢å•å·æ›´æ–°æˆåŠŸï¼Œupdated info:`, updatedOrderInfo);
       } catch (e) {
-        console.error("❌ [addOrderNumberModal] 更新数据库单号失败：", e.message);
-        console.error("❌ [addOrderNumberModal] 错误堆栈：", e.stack);
+        console.error("âŒ [addOrderNumberModal] æ›´æ–°æ•°æ®åº“å•å·å¤±è´¥ï¼š", e.message);
+        console.error("âŒ [addOrderNumberModal] é”™è¯¯å †æ ˆï¼š", e.stack);
         return await interaction.reply({
-          content: `❌ 数据库更新失败: ${e.message}`,
+          content: `âŒ æ•°æ®åº“æ›´æ–°å¤±è´¥: ${e.message}`,
           ephemeral: true,
         });
       }
 
-      // 📢 发送单号更新通知到报备群
+      // ðŸ“¢ å‘é€å•å·æ›´æ–°é€šçŸ¥åˆ°æŠ¥å¤‡ç¾¤
       if (updatedOrderInfo) {
         try {
           const reportChannel = guild.channels.cache.get(REPORT_CHANNEL_ID);
           if (reportChannel) {
-            let updateMsg = `✅ <@${interaction.user.id}> 已添加单号\n`;
-            updateMsg += `📦 **单号:** ${orderNumber}\n`;
+            let updateMsg = `âœ… <@${interaction.user.id}> å·²æ·»åŠ å•å·\n`;
+            updateMsg += `ðŸ“¦ **å•å·:** ${orderNumber}\n`;
             
-            // 使用统一的字段名称显示信息
+            // ä½¿ç”¨ç»Ÿä¸€çš„å­—æ®µåç§°æ˜¾ç¤ºä¿¡æ¯
             if (updatedOrderInfo.source === "reportForm") {
-              updateMsg += `🧑‍💼 **老板:** ${updatedOrderInfo.boss || "未知"}\n`;
-              updateMsg += `🧚 **陪陪:** ${updatedOrderInfo.player || "未知"}\n`;
-              updateMsg += `📌 **类型:** ${updatedOrderInfo.orderType || "未知"}\n`;
-              updateMsg += `⏰ **时长:** ${updatedOrderInfo.duration || "未知"}\n`;
-              updateMsg += `💰 **金额:** RM ${updatedOrderInfo.amount || 0}`;
+              updateMsg += `ðŸ§‘â€ðŸ’¼ **è€æ¿:** ${updatedOrderInfo.boss || "æœªçŸ¥"}\n`;
+              updateMsg += `ðŸ§š **é™ªé™ª:** ${updatedOrderInfo.player || "æœªçŸ¥"}\n`;
+              updateMsg += `ðŸ“Œ **ç±»åž‹:** ${updatedOrderInfo.orderType || "æœªçŸ¥"}\n`;
+              updateMsg += `â° **æ—¶é•¿:** ${updatedOrderInfo.duration || "æœªçŸ¥"}\n`;
+              updateMsg += `ðŸ’° **é‡‘é¢:** RM ${updatedOrderInfo.amount || 0}`;
             } else if (updatedOrderInfo.source === "giftReportForm") {
-              // 礼物报备使用相同的字段（从前端表单映射过来）
-              updateMsg += `🧑‍💼 **赠礼者:** ${updatedOrderInfo.boss || "未知"}\n`;
-              updateMsg += `🧚 **收礼者:** ${updatedOrderInfo.player || "未知"}\n`;
-              updateMsg += `🎁 **礼物:** ${updatedOrderInfo.orderType || "未知"}\n`;
-              updateMsg += `💰 **价值:** RM ${updatedOrderInfo.amount || 0}`;
+              // ç¤¼ç‰©æŠ¥å¤‡ä½¿ç”¨ç›¸åŒçš„å­—æ®µï¼ˆä»Žå‰ç«¯è¡¨å•æ˜ å°„è¿‡æ¥ï¼‰
+              updateMsg += `ðŸ§‘â€ðŸ’¼ **èµ ç¤¼è€…:** ${updatedOrderInfo.boss || "æœªçŸ¥"}\n`;
+              updateMsg += `ðŸ§š **æ”¶ç¤¼è€…:** ${updatedOrderInfo.player || "æœªçŸ¥"}\n`;
+              updateMsg += `ðŸŽ **ç¤¼ç‰©:** ${updatedOrderInfo.orderType || "æœªçŸ¥"}\n`;
+              updateMsg += `ðŸ’° **ä»·å€¼:** RM ${updatedOrderInfo.amount || 0}`;
             } else if (updatedOrderInfo.source === "renewReportForm") {
-              updateMsg += `🧑‍💼 **老板:** ${updatedOrderInfo.boss || "未知"}\n`;
-              updateMsg += `🧚 **陪陪:** ${updatedOrderInfo.player || "未知"}\n`;
-              updateMsg += `⏰ **时长:** ${updatedOrderInfo.duration || "未知"}\n`;
-              updateMsg += `💰 **金额:** RM ${updatedOrderInfo.amount || 0}`;
+              updateMsg += `ðŸ§‘â€ðŸ’¼ **è€æ¿:** ${updatedOrderInfo.boss || "æœªçŸ¥"}\n`;
+              updateMsg += `ðŸ§š **é™ªé™ª:** ${updatedOrderInfo.player || "æœªçŸ¥"}\n`;
+              updateMsg += `â° **æ—¶é•¿:** ${updatedOrderInfo.duration || "æœªçŸ¥"}\n`;
+              updateMsg += `ðŸ’° **é‡‘é¢:** RM ${updatedOrderInfo.amount || 0}`;
             }
 
             const updateEmbed = new EmbedBuilder()
               .setColor(THEME_COLOR)
-              .setTitle("🔢 单号已添加")
+              .setTitle("ðŸ”¢ å•å·å·²æ·»åŠ ")
               .setDescription(updateMsg)
-              .setFooter({ text: "单子报备 • 已更新" })
+              .setFooter({ text: "å•å­æŠ¥å¤‡ â€¢ å·²æ›´æ–°" })
               .setTimestamp();
 
             await reportChannel.send({ embeds: [updateEmbed] });
           }
         } catch (err) {
-          console.error("发送单号更新到报备群失败：", err);
+          console.error("å‘é€å•å·æ›´æ–°åˆ°æŠ¥å¤‡ç¾¤å¤±è´¥ï¼š", err);
         }
       }
 
       addOrderContext.delete(interaction.user.id);
 
       await interaction.reply({
-        content: `✅ 单号已更新为：${orderNumber}，谢谢～`,
+        content: `âœ… å•å·å·²æ›´æ–°ä¸ºï¼š${orderNumber}ï¼Œè°¢è°¢ï½ž`,
         ephemeral: true,
       });
 
       return;
     }
 
-    // ====================== 报备系统结束 ======================
+    // ====================== æŠ¥å¤‡ç³»ç»Ÿç»“æŸ ======================
     // ---------------------------------------------------------
-    // /datacenter 命令 - 数据管理中心主入口
+    // /datacenter å‘½ä»¤ - æ•°æ®ç®¡ç†ä¸­å¿ƒä¸»å…¥å£
     // ---------------------------------------------------------
     if (
       interaction.isChatInputCommand() &&
       interaction.commandName === "datacenter"
     ) {
       try {
-        // 【架构改造】使用SQLite直接查询而非statistics.loadOrdersData()
+        // ã€æž¶æž„æ”¹é€ ã€‘ä½¿ç”¨SQLiteç›´æŽ¥æŸ¥è¯¢è€Œéžstatistics.loadOrdersData()
         const summary = db.getStatsSummary();
         const qualityCheck = db.performDataQualityCheck();
 
         const embed = new EmbedBuilder()
           .setColor(THEME_COLOR)
-          .setTitle("📊 数据管理中心")
-          .setDescription(`${sep()}\n统计 • 分析 • 导出 • 检查\n${sep()}`)
+          .setTitle("ðŸ“Š æ•°æ®ç®¡ç†ä¸­å¿ƒ")
+          .setDescription(`${sep()}\nç»Ÿè®¡ â€¢ åˆ†æž â€¢ å¯¼å‡º â€¢ æ£€æŸ¥\n${sep()}`)
           .addFields(
             {
-              name: "📈 数据概览",
+              name: "ðŸ“ˆ æ•°æ®æ¦‚è§ˆ",
               value: statistics.formatSummary(summary),
               inline: false,
             },
             {
-              name: "⚠️ 数据质量",
+              name: "âš ï¸ æ•°æ®è´¨é‡",
               value: qualityCheck.issues.length > 0 
                 ? qualityCheck.issues.join('\n') 
-                : '✅ 数据完整无误',
+                : 'âœ… æ•°æ®å®Œæ•´æ— è¯¯',
               inline: false,
             }
           )
-          .setFooter({ text: '最后更新: ' + new Date().toLocaleString('zh-CN') });
+          .setFooter({ text: 'æœ€åŽæ›´æ–°: ' + new Date().toLocaleString('zh-CN') });
 
         const row1 = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId("export_excel")
-            .setLabel("📥 导出 Excel")
+            .setLabel("ðŸ“¥ å¯¼å‡º Excel")
             .setStyle(ButtonStyle.Success),
           new ButtonBuilder()
             .setCustomId("datacenter_ranking")
-            .setLabel("📊 查看排行")
+            .setLabel("ðŸ“Š æŸ¥çœ‹æŽ’è¡Œ")
             .setStyle(ButtonStyle.Primary),
           new ButtonBuilder()
             .setCustomId("datacenter_quality_check")
-            .setLabel("🔍 数据检查")
+            .setLabel("ðŸ” æ•°æ®æ£€æŸ¥")
             .setStyle(ButtonStyle.Secondary)
         );
 
         const row2 = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId("datacenter_time_filter")
-            .setLabel("📅 时间筛选")
+            .setLabel("ðŸ“… æ—¶é—´ç­›é€‰")
             .setStyle(ButtonStyle.Primary),
           new ButtonBuilder()
             .setCustomId("export_excel")
-            .setLabel("✈️ 发送到飞机")
+            .setLabel("âœˆï¸ å‘é€åˆ°é£žæœº")
             .setStyle(ButtonStyle.Danger),
           new ButtonBuilder()
             .setCustomId("datacenter_refresh")
-            .setLabel("🔄 刷新")
+            .setLabel("ðŸ”„ åˆ·æ–°")
             .setStyle(ButtonStyle.Secondary)
         );
 
@@ -1506,9 +1510,9 @@ client.on("interactionCreate", async (interaction) => {
           ephemeral: true,
         });
       } catch (err) {
-        console.error("数据管理中心错误:", err);
+        console.error("æ•°æ®ç®¡ç†ä¸­å¿ƒé”™è¯¯:", err);
         await interaction.reply({
-          content: "❌ 加载数据管理中心失败，请稍后重试",
+          content: "âŒ åŠ è½½æ•°æ®ç®¡ç†ä¸­å¿ƒå¤±è´¥ï¼Œè¯·ç¨åŽé‡è¯•",
           ephemeral: true,
         });
       }
@@ -1516,62 +1520,62 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // ---------------------------------------------------------
-    // 数据管理中心 - 导出 CSV - 已改为 export_excel
+    // æ•°æ®ç®¡ç†ä¸­å¿ƒ - å¯¼å‡º CSV - å·²æ”¹ä¸º export_excel
     // ---------------------------------------------------------
-    // 【已弃用】此处理器已移除，导出改为使用 export_excel
+    // ã€å·²å¼ƒç”¨ã€‘æ­¤å¤„ç†å™¨å·²ç§»é™¤ï¼Œå¯¼å‡ºæ”¹ä¸ºä½¿ç”¨ export_excel
 
     // ---------------------------------------------------------
-    // 数据管理中心 - 查看排行
+    // æ•°æ®ç®¡ç†ä¸­å¿ƒ - æŸ¥çœ‹æŽ’è¡Œ
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "datacenter_ranking") {
       try {
-        // 【架构改造】使用SQLite GROUP BY查询而非statistics计算
+        // ã€æž¶æž„æ”¹é€ ã€‘ä½¿ç”¨SQLite GROUP BYæŸ¥è¯¢è€Œéžstatisticsè®¡ç®—
         const assigners = db.getAssignerRankingFromDB();
         const players = db.getPlayerRankingFromDB();
         const bosses = db.getBossRankingFromDB();
 
         const assignersText = assigners
-          .map((a, i) => `${i + 1}. ${a.name}: RM ${a.totalPrice} (${a.count}单)`)
-          .join('\n') || '暂无数据';
+          .map((a, i) => `${i + 1}. ${a.name}: RM ${a.totalPrice} (${a.count}å•)`)
+          .join('\n') || 'æš‚æ— æ•°æ®';
 
         const playersText = players
           .map((p, i) => `${i + 1}. ${p.name}: RM ${p.total}`)
-          .join('\n') || '暂无数据';
+          .join('\n') || 'æš‚æ— æ•°æ®';
 
         const bossesText = bosses
-          .map((b, i) => `${i + 1}. ${b.name}: RM ${b.totalAmount} (${b.count}单)`)
-          .join('\n') || '暂无数据';
+          .map((b, i) => `${i + 1}. ${b.name}: RM ${b.totalAmount} (${b.count}å•)`)
+          .join('\n') || 'æš‚æ— æ•°æ®';
 
         const embed = new EmbedBuilder()
           .setColor(THEME_COLOR)
-          .setTitle("📊 排行榜分析")
+          .setTitle("ðŸ“Š æŽ’è¡Œæ¦œåˆ†æž")
           .addFields(
             {
-              name: "🏆 派单员排行 (Top 10)",
+              name: "ðŸ† æ´¾å•å‘˜æŽ’è¡Œ (Top 10)",
               value: `\`\`\`\n${assignersText}\n\`\`\``,
               inline: false,
             },
             {
-              name: "⭐ 陪玩员排行 (Top 10)",
+              name: "â­ é™ªçŽ©å‘˜æŽ’è¡Œ (Top 10)",
               value: `\`\`\`\n${playersText}\n\`\`\``,
               inline: false,
             },
             {
-              name: "👑 老板排行 (Top 10)",
+              name: "ðŸ‘‘ è€æ¿æŽ’è¡Œ (Top 10)",
               value: `\`\`\`\n${bossesText}\n\`\`\``,
               inline: false,
             }
           )
-          .setFooter({ text: '数据于 ' + new Date().toLocaleString('zh-CN') + ' 生成' });
+          .setFooter({ text: 'æ•°æ®äºŽ ' + new Date().toLocaleString('zh-CN') + ' ç”Ÿæˆ' });
 
         await interaction.reply({
           embeds: [embed],
           ephemeral: true,
         });
       } catch (err) {
-        console.error("查看排行错误:", err);
+        console.error("æŸ¥çœ‹æŽ’è¡Œé”™è¯¯:", err);
         await interaction.reply({
-          content: `❌ 加载排行失败: ${err.message}`,
+          content: `âŒ åŠ è½½æŽ’è¡Œå¤±è´¥: ${err.message}`,
           ephemeral: true,
         });
       }
@@ -1579,38 +1583,38 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // ---------------------------------------------------------
-    // 数据管理中心 - 数据检查
+    // æ•°æ®ç®¡ç†ä¸­å¿ƒ - æ•°æ®æ£€æŸ¥
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "datacenter_quality_check") {
       try {
-        // 【架构改造】使用SQLite质量检查而非statistics计算
+        // ã€æž¶æž„æ”¹é€ ã€‘ä½¿ç”¨SQLiteè´¨é‡æ£€æŸ¥è€Œéžstatisticsè®¡ç®—
         const check = db.performDataQualityCheck();
 
         let description = '';
         if (check.issues.length > 0) {
-          description += '**⚠️ 问题项:**\n' + check.issues.join('\n') + '\n\n';
+          description += '**âš ï¸ é—®é¢˜é¡¹:**\n' + check.issues.join('\n') + '\n\n';
         }
         if (check.warnings.length > 0) {
-          description += '**📌 提醒项:**\n' + check.warnings.join('\n');
+          description += '**ðŸ“Œ æé†’é¡¹:**\n' + check.warnings.join('\n');
         }
         if (check.issues.length === 0 && check.warnings.length === 0) {
-          description = '✅ 恭喜！数据完整无误～';
+          description = 'âœ… æ­å–œï¼æ•°æ®å®Œæ•´æ— è¯¯ï½ž';
         }
 
         const embed = new EmbedBuilder()
           .setColor(check.hasIssues ? 0xff6b6b : 0x51cf66)
-          .setTitle("🔍 数据质量检查")
+          .setTitle("ðŸ” æ•°æ®è´¨é‡æ£€æŸ¥")
           .setDescription(description)
-          .setFooter({ text: '总计: ' + check.totalIssuesAndWarnings + ' 项' });
+          .setFooter({ text: 'æ€»è®¡: ' + check.totalIssuesAndWarnings + ' é¡¹' });
 
         await interaction.reply({
           embeds: [embed],
           ephemeral: true,
         });
       } catch (err) {
-        console.error("数据检查错误:", err);
+        console.error("æ•°æ®æ£€æŸ¥é”™è¯¯:", err);
         await interaction.reply({
-          content: `❌ 检查失败: ${err.message}`,
+          content: `âŒ æ£€æŸ¥å¤±è´¥: ${err.message}`,
           ephemeral: true,
         });
       }
@@ -1618,69 +1622,69 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // ---------------------------------------------------------
-    // 数据管理中心 - 导出到 Telegram
+    // æ•°æ®ç®¡ç†ä¸­å¿ƒ - å¯¼å‡ºåˆ° Telegram
     // ---------------------------------------------------------
     // ---------------------------------------------------------
-    // 数据管理中心 - 导出到 Telegram - 已改为 export_excel
+    // æ•°æ®ç®¡ç†ä¸­å¿ƒ - å¯¼å‡ºåˆ° Telegram - å·²æ”¹ä¸º export_excel
     // ---------------------------------------------------------
-    // 【已弃用】此处理器已移除，导出改为使用 export_excel
+    // ã€å·²å¼ƒç”¨ã€‘æ­¤å¤„ç†å™¨å·²ç§»é™¤ï¼Œå¯¼å‡ºæ”¹ä¸ºä½¿ç”¨ export_excel
 
     // ---------------------------------------------------------
-    // 数据管理中心 - 刷新
+    // æ•°æ®ç®¡ç†ä¸­å¿ƒ - åˆ·æ–°
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "datacenter_refresh") {
       try {
-        // 【架构改造】使用SQLite直接查询而非statistics.loadOrdersData()
+        // ã€æž¶æž„æ”¹é€ ã€‘ä½¿ç”¨SQLiteç›´æŽ¥æŸ¥è¯¢è€Œéžstatistics.loadOrdersData()
         const summary = db.getStatsSummary();
         const qualityCheck = db.performDataQualityCheck();
 
         const embed = new EmbedBuilder()
           .setColor(THEME_COLOR)
-          .setTitle("📊 数据管理中心")
-          .setDescription(`${sep()}\n统计 • 分析 • 导出 • 检查\n${sep()}`)
+          .setTitle("ðŸ“Š æ•°æ®ç®¡ç†ä¸­å¿ƒ")
+          .setDescription(`${sep()}\nç»Ÿè®¡ â€¢ åˆ†æž â€¢ å¯¼å‡º â€¢ æ£€æŸ¥\n${sep()}`)
           .addFields(
             {
-              name: "📈 数据概览",
+              name: "ðŸ“ˆ æ•°æ®æ¦‚è§ˆ",
               value: statistics.formatSummary(summary),
               inline: false,
             },
             {
-              name: "⚠️ 数据质量",
+              name: "âš ï¸ æ•°æ®è´¨é‡",
               value: qualityCheck.issues.length > 0 
                 ? qualityCheck.issues.join('\n') 
-                : '✅ 数据完整无误',
+                : 'âœ… æ•°æ®å®Œæ•´æ— è¯¯',
               inline: false,
             }
           )
-          .setFooter({ text: '最后更新: ' + new Date().toLocaleString('zh-CN') });
+          .setFooter({ text: 'æœ€åŽæ›´æ–°: ' + new Date().toLocaleString('zh-CN') });
 
         const row1 = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId("export_excel")
-            .setLabel("📥 导出 Excel")
+            .setLabel("ðŸ“¥ å¯¼å‡º Excel")
             .setStyle(ButtonStyle.Success),
           new ButtonBuilder()
             .setCustomId("datacenter_ranking")
-            .setLabel("📊 查看排行")
+            .setLabel("ðŸ“Š æŸ¥çœ‹æŽ’è¡Œ")
             .setStyle(ButtonStyle.Primary),
           new ButtonBuilder()
             .setCustomId("datacenter_quality_check")
-            .setLabel("🔍 数据检查")
+            .setLabel("ðŸ” æ•°æ®æ£€æŸ¥")
             .setStyle(ButtonStyle.Secondary)
         );
 
         const row2 = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId("datacenter_time_filter")
-            .setLabel("📅 时间筛选")
+            .setLabel("ðŸ“… æ—¶é—´ç­›é€‰")
             .setStyle(ButtonStyle.Primary),
           new ButtonBuilder()
             .setCustomId("export_excel")
-            .setLabel("✈️ 发送到飞机")
+            .setLabel("âœˆï¸ å‘é€åˆ°é£žæœº")
             .setStyle(ButtonStyle.Danger),
           new ButtonBuilder()
             .setCustomId("datacenter_refresh")
-            .setLabel("🔄 刷新")
+            .setLabel("ðŸ”„ åˆ·æ–°")
             .setStyle(ButtonStyle.Secondary)
         );
 
@@ -1689,9 +1693,9 @@ client.on("interactionCreate", async (interaction) => {
           components: [row1, row2],
         });
       } catch (err) {
-        console.error("刷新错误:", err);
+        console.error("åˆ·æ–°é”™è¯¯:", err);
         await interaction.reply({
-          content: `❌ 刷新失败: ${err.message}`,
+          content: `âŒ åˆ·æ–°å¤±è´¥: ${err.message}`,
           ephemeral: true,
         });
       }
@@ -1699,7 +1703,7 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // ---------------------------------------------------------
-    // 数据管理中心 - 时间筛选
+    // æ•°æ®ç®¡ç†ä¸­å¿ƒ - æ—¶é—´ç­›é€‰
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "datacenter_time_filter") {
       try {
@@ -1710,7 +1714,7 @@ client.on("interactionCreate", async (interaction) => {
         const oneMonthAgo = new Date(today);
         oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
 
-        // 格式化日期为 YYYY/M/D HH:MM:SS
+        // æ ¼å¼åŒ–æ—¥æœŸä¸º YYYY/M/D HH:MM:SS
         const formatDateTime = (date, time = '00:00:00') => {
           const year = date.getFullYear();
           const month = date.getMonth() + 1;
@@ -1721,45 +1725,45 @@ client.on("interactionCreate", async (interaction) => {
         const row = new ActionRowBuilder().addComponents(
           new StringSelectMenuBuilder()
             .setCustomId("time_filter_select")
-            .setPlaceholder("选择时间范围")
+            .setPlaceholder("é€‰æ‹©æ—¶é—´èŒƒå›´")
             .addOptions(
               {
-                label: "今天",
+                label: "ä»Šå¤©",
                 value: `${formatDateTime(today, '00:00:00')}_${formatDateTime(today, '23:59:59')}`,
-                description: "仅显示今天的数据",
+                description: "ä»…æ˜¾ç¤ºä»Šå¤©çš„æ•°æ®",
               },
               {
-                label: "最近7天",
+                label: "æœ€è¿‘7å¤©",
                 value: `${formatDateTime(oneWeekAgo, '00:00:00')}_${formatDateTime(today, '23:59:59')}`,
-                description: "最近7天内的数据",
+                description: "æœ€è¿‘7å¤©å†…çš„æ•°æ®",
               },
               {
-                label: "最近30天",
+                label: "æœ€è¿‘30å¤©",
                 value: `${formatDateTime(oneMonthAgo, '00:00:00')}_${formatDateTime(today, '23:59:59')}`,
-                description: "最近30天内的数据",
+                description: "æœ€è¿‘30å¤©å†…çš„æ•°æ®",
               },
               {
-                label: "全部数据",
+                label: "å…¨éƒ¨æ•°æ®",
                 value: "all",
-                description: "显示所有数据",
+                description: "æ˜¾ç¤ºæ‰€æœ‰æ•°æ®",
               },
               {
-                label: "自定义时段",
+                label: "è‡ªå®šä¹‰æ—¶æ®µ",
                 value: "custom",
-                description: "自定义开始和结束日期时间",
+                description: "è‡ªå®šä¹‰å¼€å§‹å’Œç»“æŸæ—¥æœŸæ—¶é—´",
               }
             )
         );
 
         await interaction.reply({
-          content: "📅 请选择要统计的时间范围:",
+          content: "ðŸ“… è¯·é€‰æ‹©è¦ç»Ÿè®¡çš„æ—¶é—´èŒƒå›´:",
           components: [row],
           ephemeral: true,
         });
       } catch (err) {
-        console.error("时间筛选错误:", err);
+        console.error("æ—¶é—´ç­›é€‰é”™è¯¯:", err);
         await interaction.reply({
-          content: `❌ 时间筛选失败: ${err.message}`,
+          content: `âŒ æ—¶é—´ç­›é€‰å¤±è´¥: ${err.message}`,
           ephemeral: true,
         });
       }
@@ -1767,32 +1771,32 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // ---------------------------------------------------------
-    // 时间筛选 - 选择菜单处理
+    // æ—¶é—´ç­›é€‰ - é€‰æ‹©èœå•å¤„ç†
     // ---------------------------------------------------------
     if (interaction.isStringSelectMenu() && interaction.customId === "time_filter_select") {
       try {
         const value = interaction.values[0];
 
-        // 处理自定义时段
+        // å¤„ç†è‡ªå®šä¹‰æ—¶æ®µ
         if (value === "custom") {
           const modal = new ModalBuilder()
             .setCustomId("custom_time_filter_modal")
-            .setTitle("自定义时间范围");
+            .setTitle("è‡ªå®šä¹‰æ—¶é—´èŒƒå›´");
 
           modal.addComponents(
             new ActionRowBuilder().addComponents(
               new TextInputBuilder()
                 .setCustomId("custom_start_date")
-                .setLabel("开始日期 (YYYY/M/D)")
-                .setPlaceholder("例如: 2026/1/1")
+                .setLabel("å¼€å§‹æ—¥æœŸ (YYYY/M/D)")
+                .setPlaceholder("ä¾‹å¦‚: 2026/1/1")
                 .setRequired(true)
                 .setMaxLength(20)
             ),
             new ActionRowBuilder().addComponents(
               new TextInputBuilder()
                 .setCustomId("custom_start_time")
-                .setLabel("开始时间 (HH:MM:SS)")
-                .setPlaceholder("例如: 00:00:00")
+                .setLabel("å¼€å§‹æ—¶é—´ (HH:MM:SS)")
+                .setPlaceholder("ä¾‹å¦‚: 00:00:00")
                 .setValue("00:00:00")
                 .setRequired(true)
                 .setMaxLength(20)
@@ -1800,16 +1804,16 @@ client.on("interactionCreate", async (interaction) => {
             new ActionRowBuilder().addComponents(
               new TextInputBuilder()
                 .setCustomId("custom_end_date")
-                .setLabel("结束日期 (YYYY/M/D)")
-                .setPlaceholder("例如: 2026/1/3")
+                .setLabel("ç»“æŸæ—¥æœŸ (YYYY/M/D)")
+                .setPlaceholder("ä¾‹å¦‚: 2026/1/3")
                 .setRequired(true)
                 .setMaxLength(20)
             ),
             new ActionRowBuilder().addComponents(
               new TextInputBuilder()
                 .setCustomId("custom_end_time")
-                .setLabel("结束时间 (HH:MM:SS)")
-                .setPlaceholder("例如: 23:59:59")
+                .setLabel("ç»“æŸæ—¶é—´ (HH:MM:SS)")
+                .setPlaceholder("ä¾‹å¦‚: 23:59:59")
                 .setValue("23:59:59")
                 .setRequired(true)
                 .setMaxLength(20)
@@ -1824,7 +1828,7 @@ client.on("interactionCreate", async (interaction) => {
 
         let filteredOrders;
 
-        // 【架构改造】使用SQLite WHERE查询而非JS数组filter
+        // ã€æž¶æž„æ”¹é€ ã€‘ä½¿ç”¨SQLite WHEREæŸ¥è¯¢è€ŒéžJSæ•°ç»„filter
         if (value === "all") {
           filteredOrders = db.getAllOrders();
         } else {
@@ -1834,14 +1838,14 @@ client.on("interactionCreate", async (interaction) => {
 
         if (filteredOrders.length === 0) {
           return await interaction.editReply({
-            content: "📊 选定时间范围内暂无数据～",
+            content: "ðŸ“Š é€‰å®šæ—¶é—´èŒƒå›´å†…æš‚æ— æ•°æ®ï½ž",
           });
         }
 
-        // 根据筛选数据计算统计（使用statistics格式化）
+        // æ ¹æ®ç­›é€‰æ•°æ®è®¡ç®—ç»Ÿè®¡ï¼ˆä½¿ç”¨statisticsæ ¼å¼åŒ–ï¼‰
         const summary = statistics.calculateSummary(filteredOrders);
         
-        // 【架构改造】如果是时间范围筛选，使用SQLite GROUP BY查询排行
+        // ã€æž¶æž„æ”¹é€ ã€‘å¦‚æžœæ˜¯æ—¶é—´èŒƒå›´ç­›é€‰ï¼Œä½¿ç”¨SQLite GROUP BYæŸ¥è¯¢æŽ’è¡Œ
         let assigners, players;
         if (value !== "all") {
           const [startStr, endStr] = value.split("_");
@@ -1854,88 +1858,88 @@ client.on("interactionCreate", async (interaction) => {
 
         const embed = new EmbedBuilder()
           .setColor(THEME_COLOR)
-          .setTitle("📊 时间范围统计")
+          .setTitle("ðŸ“Š æ—¶é—´èŒƒå›´ç»Ÿè®¡")
           .setDescription(statistics.formatSummary(summary))
           .addFields(
             {
-              name: "🏆 派单员排行",
+              name: "ðŸ† æ´¾å•å‘˜æŽ’è¡Œ",
               value:
                 assigners.length > 0
                   ? assigners
                       .map((a, i) => `${i + 1}. ${a.name}: RM ${a.totalPrice}`)
                       .join('\n')
-                  : "暂无",
+                  : "æš‚æ— ",
               inline: true,
             },
             {
-              name: "⭐ 陪玩员排行",
+              name: "â­ é™ªçŽ©å‘˜æŽ’è¡Œ",
               value:
                 players.length > 0
                   ? players
                       .map((p, i) => `${i + 1}. ${p.name}: RM ${p.total}`)
                       .slice(0, 5)
                       .join('\n')
-                  : "暂无",
+                  : "æš‚æ— ",
               inline: true,
             }
           )
-          .setFooter({ text: '统计结果，统计于 ' + new Date().toLocaleString('zh-CN') });
+          .setFooter({ text: 'ç»Ÿè®¡ç»“æžœï¼Œç»Ÿè®¡äºŽ ' + new Date().toLocaleString('zh-CN') });
 
-        // 导出按钮
+        // å¯¼å‡ºæŒ‰é’®
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId("export_excel")
-            .setLabel("📥 导出 Excel")
+            .setLabel("ðŸ“¥ å¯¼å‡º Excel")
             .setStyle(ButtonStyle.Success),
           new ButtonBuilder()
             .setCustomId("datacenter_refresh")
-            .setLabel("🔄 返回主面板")
+            .setLabel("ðŸ”„ è¿”å›žä¸»é¢æ¿")
             .setStyle(ButtonStyle.Secondary)
         );
 
-        // 【架构改造】不再使用global.filteredOrdersCache缓存，改为SQLite实时查询
+        // ã€æž¶æž„æ”¹é€ ã€‘ä¸å†ä½¿ç”¨global.filteredOrdersCacheç¼“å­˜ï¼Œæ”¹ä¸ºSQLiteå®žæ—¶æŸ¥è¯¢
 
         await interaction.editReply({
           embeds: [embed],
           components: [row],
         });
       } catch (err) {
-        console.error("时间筛选处理错误:", err);
+        console.error("æ—¶é—´ç­›é€‰å¤„ç†é”™è¯¯:", err);
         await interaction.editReply({
-          content: `❌ 处理失败: ${err.message}`,
+          content: `âŒ å¤„ç†å¤±è´¥: ${err.message}`,
         });
       }
       return;
     }
 
     // ---------------------------------------------------------
-    // 自定义时间范围 - Modal 提交处理
+    // è‡ªå®šä¹‰æ—¶é—´èŒƒå›´ - Modal æäº¤å¤„ç†
     // ---------------------------------------------------------
     if (interaction.isModalSubmit() && interaction.customId === "custom_time_filter_modal") {
       try {
-        console.log("[自定义时间筛选] 用户提交数据");
+        console.log("[è‡ªå®šä¹‰æ—¶é—´ç­›é€‰] ç”¨æˆ·æäº¤æ•°æ®");
         
         const startDate = interaction.fields.getTextInputValue("custom_start_date");
         const startTime = interaction.fields.getTextInputValue("custom_start_time");
         const endDate = interaction.fields.getTextInputValue("custom_end_date");
         const endTime = interaction.fields.getTextInputValue("custom_end_time");
 
-        console.log(`[自定义时间筛选] 收到数据: ${startDate} ${startTime} ~ ${endDate} ${endTime}`);
+        console.log(`[è‡ªå®šä¹‰æ—¶é—´ç­›é€‰] æ”¶åˆ°æ•°æ®: ${startDate} ${startTime} ~ ${endDate} ${endTime}`);
 
         const startDateTime = `${startDate} ${startTime}`;
         const endDateTime = `${endDate} ${endTime}`;
 
-        // 验证日期格式
+        // éªŒè¯æ—¥æœŸæ ¼å¼
         const validateDateTime = (dateTime) => {
           const dateRegex = /^\d{4}\/\d{1,2}\/\d{1,2}$/;
           const timeRegex = /^\d{1,2}:\d{2}:\d{2}$/;
           const [date, time] = dateTime.split(' ');
           
           if (!dateRegex.test(date) || !timeRegex.test(time)) {
-            throw new Error(`日期格式错误: ${dateTime}. 应为 YYYY/M/D HH:MM:SS`);
+            throw new Error(`æ—¥æœŸæ ¼å¼é”™è¯¯: ${dateTime}. åº”ä¸º YYYY/M/D HH:MM:SS`);
           }
           
-          // 验证日期和时间的有效性
+          // éªŒè¯æ—¥æœŸå’Œæ—¶é—´çš„æœ‰æ•ˆæ€§
           const dateParts = date.split('/');
           const timeParts = time.split(':');
           const year = parseInt(dateParts[0]);
@@ -1947,109 +1951,109 @@ client.on("interactionCreate", async (interaction) => {
           
           if (month < 1 || month > 12 || day < 1 || day > 31 || 
               hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) {
-            throw new Error(`日期或时间数值无效: ${dateTime}`);
+            throw new Error(`æ—¥æœŸæˆ–æ—¶é—´æ•°å€¼æ— æ•ˆ: ${dateTime}`);
           }
         };
 
         validateDateTime(startDateTime);
         validateDateTime(endDateTime);
 
-        console.log("[自定义时间筛选] 日期格式验证通过");
+        console.log("[è‡ªå®šä¹‰æ—¶é—´ç­›é€‰] æ—¥æœŸæ ¼å¼éªŒè¯é€šè¿‡");
 
-        // 【架构改造】使用SQLite WHERE查询而非JS数组filter
+        // ã€æž¶æž„æ”¹é€ ã€‘ä½¿ç”¨SQLite WHEREæŸ¥è¯¢è€ŒéžJSæ•°ç»„filter
         const dateStr = startDateTime.split(' ')[0];
         const filteredOrders = db.getOrdersByDateRange(dateStr, dateStr);
-        console.log(`[自定义时间筛选] 从SQLite查询得到 ${filteredOrders.length} 条订单`);
+        console.log(`[è‡ªå®šä¹‰æ—¶é—´ç­›é€‰] ä»ŽSQLiteæŸ¥è¯¢å¾—åˆ° ${filteredOrders.length} æ¡è®¢å•`);
 
         await interaction.deferReply({ ephemeral: true });
 
         if (filteredOrders.length === 0) {
           return await interaction.editReply({
-            content: `📊 时间范围 ${startDateTime} 至 ${endDateTime} 内暂无数据～`,
+            content: `ðŸ“Š æ—¶é—´èŒƒå›´ ${startDateTime} è‡³ ${endDateTime} å†…æš‚æ— æ•°æ®ï½ž`,
           });
         }
 
-        // 根据筛选数据计算统计
+        // æ ¹æ®ç­›é€‰æ•°æ®è®¡ç®—ç»Ÿè®¡
         const summary = statistics.calculateSummary(filteredOrders);
-        // 【架构改造】使用SQLite GROUP BY查询排行而非JS计算
+        // ã€æž¶æž„æ”¹é€ ã€‘ä½¿ç”¨SQLite GROUP BYæŸ¥è¯¢æŽ’è¡Œè€ŒéžJSè®¡ç®—
         const assigners = db.getAssignerRankingByDateRange(dateStr, dateStr);
         const players = db.getPlayerRankingByDateRange(dateStr, dateStr);
 
         const embed = new EmbedBuilder()
           .setColor(THEME_COLOR)
-          .setTitle("📊 自定义时间范围统计")
-          .setDescription(`📅 ${startDateTime} 至 ${endDateTime}\n\n${statistics.formatSummary(summary)}`)
+          .setTitle("ðŸ“Š è‡ªå®šä¹‰æ—¶é—´èŒƒå›´ç»Ÿè®¡")
+          .setDescription(`ðŸ“… ${startDateTime} è‡³ ${endDateTime}\n\n${statistics.formatSummary(summary)}`)
           .addFields(
             {
-              name: "🏆 派单员排行",
+              name: "ðŸ† æ´¾å•å‘˜æŽ’è¡Œ",
               value:
                 assigners.length > 0
                   ? assigners
                       .map((a, i) => `${i + 1}. ${a.name}: RM ${a.totalPrice}`)
                       .join('\n')
-                  : "暂无",
+                  : "æš‚æ— ",
               inline: true,
             },
             {
-              name: "⭐ 陪玩员排行",
+              name: "â­ é™ªçŽ©å‘˜æŽ’è¡Œ",
               value:
                 players.length > 0
                   ? players
                       .map((p, i) => `${i + 1}. ${p.name}: RM ${p.total}`)
                       .slice(0, 5)
                       .join('\n')
-                  : "暂无",
+                  : "æš‚æ— ",
               inline: true,
             }
           )
-          .setFooter({ text: '统计结果，统计于 ' + new Date().toLocaleString('zh-CN') });
+          .setFooter({ text: 'ç»Ÿè®¡ç»“æžœï¼Œç»Ÿè®¡äºŽ ' + new Date().toLocaleString('zh-CN') });
 
-        // 导出按钮
+        // å¯¼å‡ºæŒ‰é’®
         const row = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId("export_excel")
-            .setLabel("📥 导出 Excel")
+            .setLabel("ðŸ“¥ å¯¼å‡º Excel")
             .setStyle(ButtonStyle.Success),
           new ButtonBuilder()
             .setCustomId("datacenter_refresh")
-            .setLabel("🔄 返回主面板")
+            .setLabel("ðŸ”„ è¿”å›žä¸»é¢æ¿")
             .setStyle(ButtonStyle.Secondary)
         );
 
-        // 【架构改造】不再使用global.filteredOrdersCache缓存，改为SQLite实时查询
+        // ã€æž¶æž„æ”¹é€ ã€‘ä¸å†ä½¿ç”¨global.filteredOrdersCacheç¼“å­˜ï¼Œæ”¹ä¸ºSQLiteå®žæ—¶æŸ¥è¯¢
 
-        console.log("[自定义时间筛选] 准备发送回复");
+        console.log("[è‡ªå®šä¹‰æ—¶é—´ç­›é€‰] å‡†å¤‡å‘é€å›žå¤");
 
         await interaction.editReply({
           embeds: [embed],
           components: [row],
         });
 
-        console.log("[自定义时间筛选] 处理完成");
+        console.log("[è‡ªå®šä¹‰æ—¶é—´ç­›é€‰] å¤„ç†å®Œæˆ");
       } catch (err) {
-        console.error("自定义时间范围处理错误:", err);
-        console.error("错误堆栈:", err.stack);
+        console.error("è‡ªå®šä¹‰æ—¶é—´èŒƒå›´å¤„ç†é”™è¯¯:", err);
+        console.error("é”™è¯¯å †æ ˆ:", err.stack);
         
         try {
           if (interaction.replied || interaction.deferred) {
             await interaction.editReply({
-              content: `❌ 处理失败: ${err.message}`,
+              content: `âŒ å¤„ç†å¤±è´¥: ${err.message}`,
             });
           } else {
             await interaction.reply({
-              content: `❌ 处理失败: ${err.message}`,
+              content: `âŒ å¤„ç†å¤±è´¥: ${err.message}`,
               ephemeral: true,
             });
           }
         } catch (replyErr) {
-          console.error("回复错误失败:", replyErr);
+          console.error("å›žå¤é”™è¯¯å¤±è´¥:", replyErr);
         }
       }
       return;
     }
 
     // ---------------------------------------------------------
-    // /queryrecords（查询报备和单子记录）
+    // /queryrecordsï¼ˆæŸ¥è¯¢æŠ¥å¤‡å’Œå•å­è®°å½•ï¼‰
     // ---------------------------------------------------------
     if (
       interaction.isChatInputCommand() &&
@@ -2057,25 +2061,25 @@ client.on("interactionCreate", async (interaction) => {
     ) {
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("📊 单子查询中心")
-        .setDescription(`${sep()}\n点击下方按钮查看报备和单子记录～\n${sep()}`);
+        .setTitle("ðŸ“Š å•å­æŸ¥è¯¢ä¸­å¿ƒ")
+        .setDescription(`${sep()}\nç‚¹å‡»ä¸‹æ–¹æŒ‰é’®æŸ¥çœ‹æŠ¥å¤‡å’Œå•å­è®°å½•ï½ž\n${sep()}`);
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("view_reports")
-          .setLabel("📋 查看报备")
+          .setLabel("ðŸ“‹ æŸ¥çœ‹æŠ¥å¤‡")
           .setStyle(ButtonStyle.Primary),
         new ButtonBuilder()
           .setCustomId("view_orders")
-          .setLabel("📦 查看单子记录")
+          .setLabel("ðŸ“¦ æŸ¥çœ‹å•å­è®°å½•")
           .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
           .setCustomId("export_excel")
-          .setLabel("📊 导出 Excel")
+          .setLabel("ðŸ“Š å¯¼å‡º Excel")
           .setStyle(ButtonStyle.Danger),
         new ButtonBuilder()
           .setCustomId("export_excel")
-          .setLabel("✈️ 导出到飞机")
+          .setLabel("âœˆï¸ å¯¼å‡ºåˆ°é£žæœº")
           .setStyle(ButtonStyle.Danger)
       );
 
@@ -2084,46 +2088,46 @@ client.on("interactionCreate", async (interaction) => {
     }
 
     // ---------------------------------------------------------
-    // 导出 CSV 按钮 - 【完全重写】使用 SQLite CLI 实时查询
-    // 【约束】仅使用 SQLite 数据源，无缓存、无 JSON、无 db.getAllOrders()
+    // å¯¼å‡º CSV æŒ‰é’® - ã€å®Œå…¨é‡å†™ã€‘ä½¿ç”¨ SQLite CLI å®žæ—¶æŸ¥è¯¢
+    // ã€çº¦æŸã€‘ä»…ä½¿ç”¨ SQLite æ•°æ®æºï¼Œæ— ç¼“å­˜ã€æ—  JSONã€æ—  db.getAllOrders()
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "export_excel") {
       try {
         await interaction.deferReply({ ephemeral: true });
 
-        // 🔴【CRITICAL】不允许使用任何缓存、JSON 或中间读取
-        // - ❌ cacheManager.invalidate() - 禁止
-        // - ❌ db.getAllOrders() - 禁止
-        // - ❌ statistics.loadOrdersData() - 禁止
-        // - ❌ orders.json - 禁止
-        // ✅ 仅使用 SQLite CLI 直接查询
+        // ðŸ”´ã€CRITICALã€‘ä¸å…è®¸ä½¿ç”¨ä»»ä½•ç¼“å­˜ã€JSON æˆ–ä¸­é—´è¯»å–
+        // - âŒ cacheManager.invalidate() - ç¦æ­¢
+        // - âŒ db.getAllOrders() - ç¦æ­¢
+        // - âŒ statistics.loadOrdersData() - ç¦æ­¢
+        // - âŒ orders.json - ç¦æ­¢
+        // âœ… ä»…ä½¿ç”¨ SQLite CLI ç›´æŽ¥æŸ¥è¯¢
 
         const DB_PATH = path.join(__dirname, 'data.db');
         const TMP_DIR = path.join(__dirname, 'tmp');
         
-        // 确保 tmp 目录存在
+        // ç¡®ä¿ tmp ç›®å½•å­˜åœ¨
         if (!fs.existsSync(TMP_DIR)) {
           fs.mkdirSync(TMP_DIR, { recursive: true });
         }
 
-        // 【步骤 1】使用 SQLite CLI 实时查询 & 导出 CSV
-        // 【关键】每次都执行新的 SELECT 查询，确保获取最新数据
-        const fileName = `单子统计_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.csv`;
+        // ã€æ­¥éª¤ 1ã€‘ä½¿ç”¨ SQLite CLI å®žæ—¶æŸ¥è¯¢ & å¯¼å‡º CSV
+        // ã€å…³é”®ã€‘æ¯æ¬¡éƒ½æ‰§è¡Œæ–°çš„ SELECT æŸ¥è¯¢ï¼Œç¡®ä¿èŽ·å–æœ€æ–°æ•°æ®
+        const fileName = `å•å­ç»Ÿè®¡_${new Date().toLocaleDateString("zh-CN").replace(/\//g, "-")}.csv`;
         const filePath = path.join(TMP_DIR, fileName);
 
-        console.log(`[export_excel] 🔄 开始使用 SQLite CLI 导出...`);
-        console.log(`[export_excel] 数据库路径: ${DB_PATH}`);
-        console.log(`[export_excel] 输出路径: ${filePath}`);
+        console.log(`[export_excel] ðŸ”„ å¼€å§‹ä½¿ç”¨ SQLite CLI å¯¼å‡º...`);
+        console.log(`[export_excel] æ•°æ®åº“è·¯å¾„: ${DB_PATH}`);
+        console.log(`[export_excel] è¾“å‡ºè·¯å¾„: ${filePath}`);
 
-        // 【关键步骤】使用 sqlite3 CLI 导出 CSV
-        // .headers on    → 包含列名
-        // .mode csv      → CSV 格式
-        // .output        → 输出到文件
-        // SELECT ... ORDER BY id DESC → 最新数据优先
+        // ã€å…³é”®æ­¥éª¤ã€‘ä½¿ç”¨ sqlite3 CLI å¯¼å‡º CSV
+        // .headers on    â†’ åŒ…å«åˆ—å
+        // .mode csv      â†’ CSV æ ¼å¼
+        // .output        â†’ è¾“å‡ºåˆ°æ–‡ä»¶
+        // SELECT ... ORDER BY id DESC â†’ æœ€æ–°æ•°æ®ä¼˜å…ˆ
         const { execSync } = require('child_process');
         
         try {
-          // 【实时执行 SQLite 查询】
+          // ã€å®žæ—¶æ‰§è¡Œ SQLite æŸ¥è¯¢ã€‘
           const sql = `
 .mode csv
 .headers on
@@ -2135,74 +2139,74 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
           const cmd = `sqlite3 "${DB_PATH}" "${sql}"`;
           execSync(cmd, { encoding: 'utf8', stdio: 'pipe' });
 
-          console.log(`[export_excel] ✅ SQLite CLI 导出完成`);
+          console.log(`[export_excel] âœ… SQLite CLI å¯¼å‡ºå®Œæˆ`);
 
-          // 【步骤 2】验证文件是否成功创建
+          // ã€æ­¥éª¤ 2ã€‘éªŒè¯æ–‡ä»¶æ˜¯å¦æˆåŠŸåˆ›å»º
           if (!fs.existsSync(filePath)) {
-            throw new Error(`CSV 文件未成功创建: ${filePath}`);
+            throw new Error(`CSV æ–‡ä»¶æœªæˆåŠŸåˆ›å»º: ${filePath}`);
           }
 
           const fileSize = fs.statSync(filePath).size;
-          console.log(`[export_excel] 📁 文件大小: ${(fileSize / 1024).toFixed(2)} KB`);
+          console.log(`[export_excel] ðŸ“ æ–‡ä»¶å¤§å°: ${(fileSize / 1024).toFixed(2)} KB`);
 
-          // 【步骤 3】读取 CSV 内容，计算行数（不使用 db.getAllOrders()）
+          // ã€æ­¥éª¤ 3ã€‘è¯»å– CSV å†…å®¹ï¼Œè®¡ç®—è¡Œæ•°ï¼ˆä¸ä½¿ç”¨ db.getAllOrders()ï¼‰
           const csvContent = fs.readFileSync(filePath, 'utf8');
           const lines = csvContent.split('\n').filter(l => l.trim());
-          const dataRowCount = Math.max(0, lines.length - 1); // 减去 header 行
+          const dataRowCount = Math.max(0, lines.length - 1); // å‡åŽ» header è¡Œ
           
-          console.log(`[export_excel] 📊 数据行数: ${dataRowCount}`);
+          console.log(`[export_excel] ðŸ“Š æ•°æ®è¡Œæ•°: ${dataRowCount}`);
 
-          // 【步骤 4】作为 Discord 附件发送
+          // ã€æ­¥éª¤ 4ã€‘ä½œä¸º Discord é™„ä»¶å‘é€
           const attachment = new AttachmentBuilder(filePath, { name: fileName });
           
           await interaction.editReply({
-            content: `✅ CSV 已从 SQLite 实时导出\n📊 共 ${dataRowCount} 条记录\n💾 文件已生成，请下载`,
+            content: `âœ… CSV å·²ä»Ž SQLite å®žæ—¶å¯¼å‡º\nðŸ“Š å…± ${dataRowCount} æ¡è®°å½•\nðŸ’¾ æ–‡ä»¶å·²ç”Ÿæˆï¼Œè¯·ä¸‹è½½`,
             files: [attachment],
           });
 
-          console.log(`[export_excel] ✅ 附件已发送到 Discord`);
+          console.log(`[export_excel] âœ… é™„ä»¶å·²å‘é€åˆ° Discord`);
 
-          // 【步骤 5】异步清理本地文件（5 秒后删除）
+          // ã€æ­¥éª¤ 5ã€‘å¼‚æ­¥æ¸…ç†æœ¬åœ°æ–‡ä»¶ï¼ˆ5 ç§’åŽåˆ é™¤ï¼‰
           setTimeout(() => {
             try {
               if (fs.existsSync(filePath)) {
                 fs.unlinkSync(filePath);
-                console.log(`[export_excel] 🗑️  临时文件已删除: ${fileName}`);
+                console.log(`[export_excel] ðŸ—‘ï¸  ä¸´æ—¶æ–‡ä»¶å·²åˆ é™¤: ${fileName}`);
               }
             } catch (err) {
-              console.error(`[export_excel] ❌ 删除文件失败: ${err.message}`);
+              console.error(`[export_excel] âŒ åˆ é™¤æ–‡ä»¶å¤±è´¥: ${err.message}`);
             }
           }, 5000);
 
         } catch (execErr) {
-          console.error(`[export_excel] ❌ SQLite CLI 执行失败:`, execErr.message);
+          console.error(`[export_excel] âŒ SQLite CLI æ‰§è¡Œå¤±è´¥:`, execErr.message);
           
-          // 删除失败的文件
+          // åˆ é™¤å¤±è´¥çš„æ–‡ä»¶
           if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
           }
           
-          throw new Error(`SQLite 导出失败: ${execErr.message}`);
+          throw new Error(`SQLite å¯¼å‡ºå¤±è´¥: ${execErr.message}`);
         }
 
       } catch (err) {
-        console.error(`[export_excel] ❌ 导出流程异常:`, err.message);
-        console.error(`[export_excel] 错误堆栈:`, err.stack);
+        console.error(`[export_excel] âŒ å¯¼å‡ºæµç¨‹å¼‚å¸¸:`, err.message);
+        console.error(`[export_excel] é”™è¯¯å †æ ˆ:`, err.stack);
         
         await interaction.editReply({
-          content: `❌ 导出失败: ${err.message}\n\n💡 请检查：\n• SQLite 数据库是否可访问\n• 磁盘空间是否充足\n• 权限设置是否正确`,
+          content: `âŒ å¯¼å‡ºå¤±è´¥: ${err.message}\n\nðŸ’¡ è¯·æ£€æŸ¥ï¼š\nâ€¢ SQLite æ•°æ®åº“æ˜¯å¦å¯è®¿é—®\nâ€¢ ç£ç›˜ç©ºé—´æ˜¯å¦å……è¶³\nâ€¢ æƒé™è®¾ç½®æ˜¯å¦æ­£ç¡®`,
         });
       }
       return;
     }
 
     // ---------------------------------------------------------
-    // 导出到 Telegram（飞机）按钮 - 已改为 export_excel
+    // å¯¼å‡ºåˆ° Telegramï¼ˆé£žæœºï¼‰æŒ‰é’® - å·²æ”¹ä¸º export_excel
     // ---------------------------------------------------------
-    // 【已弃用】此处理器已移除，所有导出均使用 export_excel
+    // ã€å·²å¼ƒç”¨ã€‘æ­¤å¤„ç†å™¨å·²ç§»é™¤ï¼Œæ‰€æœ‰å¯¼å‡ºå‡ä½¿ç”¨ export_excel
 
     // ---------------------------------------------------------
-    // 查看报备记录按钮
+    // æŸ¥çœ‹æŠ¥å¤‡è®°å½•æŒ‰é’®
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "view_reports") {
       try {
@@ -2211,12 +2215,12 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
 
         if (reports.length === 0) {
           return interaction.reply({
-            content: "📋 暂无报备记录～",
+            content: "ðŸ“‹ æš‚æ— æŠ¥å¤‡è®°å½•ï½ž",
             ephemeral: true,
           });
         }
 
-        // 分页显示（每页最多 10 条）
+        // åˆ†é¡µæ˜¾ç¤ºï¼ˆæ¯é¡µæœ€å¤š 10 æ¡ï¼‰
         const pageSize = 10;
         const pages = [];
         for (let i = 0; i < reports.length; i += pageSize) {
@@ -2229,15 +2233,15 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
           const items = pages[page];
           const embed = new EmbedBuilder()
             .setColor(THEME_COLOR)
-            .setTitle(`📋 单子报备记录 (第 ${page + 1}/${pages.length} 页)`)
-            .setDescription(`${sep()}\n共 ${reports.length} 条报备记录\n${sep()}`);
+            .setTitle(`ðŸ“‹ å•å­æŠ¥å¤‡è®°å½• (ç¬¬ ${page + 1}/${pages.length} é¡µ)`)
+            .setDescription(`${sep()}\nå…± ${reports.length} æ¡æŠ¥å¤‡è®°å½•\n${sep()}`);
 
           items.forEach((report, idx) => {
             const index = page * pageSize + idx + 1;
             if (report.source === "reportForm") {
-              let value = `👤 **老板:** ${report.boss}\n🧚 **陪陪:** ${report.player}\n🧩 **类型:** ${report.orderType}\n⏰ **时长:** ${report.duration}\n💰 **金额:** RM ${report.amount}`;
+              let value = `ðŸ‘¤ **è€æ¿:** ${report.boss}\nðŸ§š **é™ªé™ª:** ${report.player}\nðŸ§© **ç±»åž‹:** ${report.orderType}\nâ° **æ—¶é•¿:** ${report.duration}\nðŸ’° **é‡‘é¢:** RM ${report.amount}`;
               if (report.orderNo) {
-                value += `\n🔢 **单号:** ${report.orderNo}`;
+                value += `\nðŸ”¢ **å•å·:** ${report.orderNo}`;
               }
               embed.addFields({
                 name: `#${index} - ${report.date}`,
@@ -2245,29 +2249,29 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
                 inline: false,
               });
             } else if (report.source === "giftReportForm") {
-              let value = `👤 **送礼人:** ${report.giver}\n🧚 **收礼人:** ${report.receiver}\n🎁 **礼物:** ${report.gift}\n💰 **价值:** RM ${report.amount}`;
+              let value = `ðŸ‘¤ **é€ç¤¼äºº:** ${report.giver}\nðŸ§š **æ”¶ç¤¼äºº:** ${report.receiver}\nðŸŽ **ç¤¼ç‰©:** ${report.gift}\nðŸ’° **ä»·å€¼:** RM ${report.amount}`;
               if (report.orderNo) {
-                value += `\n🔢 **单号:** ${report.orderNo}`;
+                value += `\nðŸ”¢ **å•å·:** ${report.orderNo}`;
               }
               embed.addFields({
-                name: `#${index} - 礼物报备 - ${report.date}`,
+                name: `#${index} - ç¤¼ç‰©æŠ¥å¤‡ - ${report.date}`,
                 value: value,
                 inline: false,
               });
             } else if (report.source === "renewReportForm") {
-              let value = `👤 **老板:** ${report.boss}\n🧚 **陪陪:** ${report.player}\n📦 **原单号:** ${report.originalOrder}\n⏰ **时长:** ${report.duration}\n💰 **金额:** RM ${report.amount}`;
+              let value = `ðŸ‘¤ **è€æ¿:** ${report.boss}\nðŸ§š **é™ªé™ª:** ${report.player}\nðŸ“¦ **åŽŸå•å·:** ${report.originalOrder}\nâ° **æ—¶é•¿:** ${report.duration}\nðŸ’° **é‡‘é¢:** RM ${report.amount}`;
               if (report.orderNo) {
-                value += `\n🔢 **新单号:** ${report.orderNo}`;
+                value += `\nðŸ”¢ **æ–°å•å·:** ${report.orderNo}`;
               }
               embed.addFields({
-                name: `#${index} - 🔄 续单报备 - ${report.date}`,
+                name: `#${index} - ðŸ”„ ç»­å•æŠ¥å¤‡ - ${report.date}`,
                 value: value,
                 inline: false,
               });
             }
           });
 
-          embed.setFooter({ text: "陪玩后宫 • 报备管理系统" });
+          embed.setFooter({ text: "é™ªçŽ©åŽå®« â€¢ æŠ¥å¤‡ç®¡ç†ç³»ç»Ÿ" });
           embed.setTimestamp();
           return embed;
         };
@@ -2275,12 +2279,12 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
         const buttons = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId("prev_report_page")
-            .setLabel("⬅️ 上一页")
+            .setLabel("â¬…ï¸ ä¸Šä¸€é¡µ")
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(currentPage === 0),
           new ButtonBuilder()
             .setCustomId("next_report_page")
-            .setLabel("下一页 ➡️")
+            .setLabel("ä¸‹ä¸€é¡µ âž¡ï¸")
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(currentPage === pages.length - 1)
         );
@@ -2305,12 +2309,12 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
             const newButtons = new ActionRowBuilder().addComponents(
               new ButtonBuilder()
                 .setCustomId("prev_report_page")
-                .setLabel("⬅️ 上一页")
+                .setLabel("â¬…ï¸ ä¸Šä¸€é¡µ")
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(currentPage === 0),
               new ButtonBuilder()
                 .setCustomId("next_report_page")
-                .setLabel("下一页 ➡️")
+                .setLabel("ä¸‹ä¸€é¡µ âž¡ï¸")
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(currentPage === pages.length - 1)
             );
@@ -2322,9 +2326,9 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
           });
         }
       } catch (err) {
-        console.error("查看报备记录错误:", err);
+        console.error("æŸ¥çœ‹æŠ¥å¤‡è®°å½•é”™è¯¯:", err);
         interaction.reply({
-          content: "❌ 查询报备记录时出错，请稍后重试～",
+          content: "âŒ æŸ¥è¯¢æŠ¥å¤‡è®°å½•æ—¶å‡ºé”™ï¼Œè¯·ç¨åŽé‡è¯•ï½ž",
           ephemeral: true,
         });
       }
@@ -2332,7 +2336,7 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // ---------------------------------------------------------
-    // 查看单子记录按钮
+    // æŸ¥çœ‹å•å­è®°å½•æŒ‰é’®
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "view_orders") {
       try {
@@ -2341,12 +2345,12 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
 
         if (assignedOrders.length === 0) {
           return interaction.reply({
-            content: "📦 暂无派单记录～",
+            content: "ðŸ“¦ æš‚æ— æ´¾å•è®°å½•ï½ž",
             ephemeral: true,
           });
         }
 
-        // 分页显示（每页最多 10 条）
+        // åˆ†é¡µæ˜¾ç¤ºï¼ˆæ¯é¡µæœ€å¤š 10 æ¡ï¼‰
         const pageSize = 10;
         const pages = [];
         for (let i = 0; i < assignedOrders.length; i += pageSize) {
@@ -2359,19 +2363,19 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
           const items = pages[page];
           const embed = new EmbedBuilder()
             .setColor(THEME_COLOR)
-            .setTitle(`📦 单子派单记录 (第 ${page + 1}/${pages.length} 页)`)
-            .setDescription(`${sep()}\n共 ${assignedOrders.length} 条派单记录\n${sep()}`);
+            .setTitle(`ðŸ“¦ å•å­æ´¾å•è®°å½• (ç¬¬ ${page + 1}/${pages.length} é¡µ)`)
+            .setDescription(`${sep()}\nå…± ${assignedOrders.length} æ¡æ´¾å•è®°å½•\n${sep()}`);
 
           items.forEach((order, idx) => {
             const index = page * pageSize + idx + 1;
             embed.addFields({
               name: `#${index} - ${order.orderNo} - ${order.date}`,
-              value: `🙋 **派单员:** ${order.assigner}\n🧚 **陪玩员:** ${order.player}\n🎮 **游戏:** ${order.game}\n⏰ **时长:** ${order.duration}\n💰 **价格:** RM ${order.price}`,
+              value: `ðŸ™‹ **æ´¾å•å‘˜:** ${order.assigner}\nðŸ§š **é™ªçŽ©å‘˜:** ${order.player}\nðŸŽ® **æ¸¸æˆ:** ${order.game}\nâ° **æ—¶é•¿:** ${order.duration}\nðŸ’° **ä»·æ ¼:** RM ${order.price}`,
               inline: false,
             });
           });
 
-          embed.setFooter({ text: "陪玩后宫 • 派单管理系统" });
+          embed.setFooter({ text: "é™ªçŽ©åŽå®« â€¢ æ´¾å•ç®¡ç†ç³»ç»Ÿ" });
           embed.setTimestamp();
           return embed;
         };
@@ -2379,12 +2383,12 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
         const buttons = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId("prev_order_page")
-            .setLabel("⬅️ 上一页")
+            .setLabel("â¬…ï¸ ä¸Šä¸€é¡µ")
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(currentPage === 0),
           new ButtonBuilder()
             .setCustomId("next_order_page")
-            .setLabel("下一页 ➡️")
+            .setLabel("ä¸‹ä¸€é¡µ âž¡ï¸")
             .setStyle(ButtonStyle.Secondary)
             .setDisabled(currentPage === pages.length - 1)
         );
@@ -2409,12 +2413,12 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
             const newButtons = new ActionRowBuilder().addComponents(
               new ButtonBuilder()
                 .setCustomId("prev_order_page")
-                .setLabel("⬅️ 上一页")
+                .setLabel("â¬…ï¸ ä¸Šä¸€é¡µ")
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(currentPage === 0),
               new ButtonBuilder()
                 .setCustomId("next_order_page")
-                .setLabel("下一页 ➡️")
+                .setLabel("ä¸‹ä¸€é¡µ âž¡ï¸")
                 .setStyle(ButtonStyle.Secondary)
                 .setDisabled(currentPage === pages.length - 1)
             );
@@ -2426,9 +2430,9 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
           });
         }
       } catch (err) {
-        console.error("查看派单记录错误:", err);
+        console.error("æŸ¥çœ‹æ´¾å•è®°å½•é”™è¯¯:", err);
         interaction.reply({
-          content: "❌ 查询派单记录时出错，请稍后重试～",
+          content: "âŒ æŸ¥è¯¢æ´¾å•è®°å½•æ—¶å‡ºé”™ï¼Œè¯·ç¨åŽé‡è¯•ï½ž",
           ephemeral: true,
         });
       }
@@ -2436,7 +2440,7 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // ---------------------------------------------------------
-    // /ticketsetup（创建陪玩订单按钮）
+    // /ticketsetupï¼ˆåˆ›å»ºé™ªçŽ©è®¢å•æŒ‰é’®ï¼‰
     // ---------------------------------------------------------
     if (
       interaction.isChatInputCommand() &&
@@ -2444,14 +2448,14 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     ) {
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("🎟️  陪玩下单系统")
+        .setTitle("ðŸŽŸï¸  é™ªçŽ©ä¸‹å•ç³»ç»Ÿ")
         .setThumbnail("https://cdn.discordapp.com/attachments/1433987480524165213/1440965791313952868/Generated_Image_November_20_2025_-_1_45PM.png?ex=69201378&is=691ec1f8&hm=2ba4de5f511070f09474d79525165cc9ce3a552b90766c65963546a58710f6a7&")
-        .setDescription(`${sep()}\n点下面的按钮填写陪玩单吧～ 💖\n${sep()}`);
+        .setDescription(`${sep()}\nç‚¹ä¸‹é¢çš„æŒ‰é’®å¡«å†™é™ªçŽ©å•å§ï½ž ðŸ’–\n${sep()}`);
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("open_ticket")
-          .setLabel("🎮 下单陪玩订单")
+          .setLabel("ðŸŽ® ä¸‹å•é™ªçŽ©è®¢å•")
           .setStyle(ButtonStyle.Primary)
       );
 
@@ -2460,43 +2464,43 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // ---------------------------------------------------------
-    // 打开陪玩订单 Modal
+    // æ‰“å¼€é™ªçŽ©è®¢å• Modal
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "open_ticket") {
       const modal = new ModalBuilder()
         .setCustomId("ticketForm")
-        .setTitle("🎮 陪玩订单表");
+        .setTitle("ðŸŽ® é™ªçŽ©è®¢å•è¡¨");
 
       modal.addComponents(
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("game")
-            .setLabel("🎮 游戏名称")
-            .setPlaceholder("例如：Valorant / CS2 / Apex")
+            .setLabel("ðŸŽ® æ¸¸æˆåç§°")
+            .setPlaceholder("ä¾‹å¦‚ï¼šValorant / CS2 / Apex")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("time")
-            .setLabel("⏰ 预定时间")
-            .setPlaceholder("例如：几小时（一局/两小时)")
+            .setLabel("â° é¢„å®šæ—¶é—´")
+            .setPlaceholder("ä¾‹å¦‚ï¼šå‡ å°æ—¶ï¼ˆä¸€å±€/ä¸¤å°æ—¶)")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("mode")
-            .setLabel("🎯 游戏模式")
-            .setPlaceholder("例如：娱乐 / 排位 / 陪玩")
+            .setLabel("ðŸŽ¯ æ¸¸æˆæ¨¡å¼")
+            .setPlaceholder("ä¾‹å¦‚ï¼šå¨±ä¹ / æŽ’ä½ / é™ªçŽ©")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("extra")
-            .setLabel("✨ 特别需求")
-            .setPlaceholder("例如：指定陪玩 / 不开麦 / 聊天（选填）")
+            .setLabel("âœ¨ ç‰¹åˆ«éœ€æ±‚")
+            .setPlaceholder("ä¾‹å¦‚ï¼šæŒ‡å®šé™ªçŽ© / ä¸å¼€éº¦ / èŠå¤©ï¼ˆé€‰å¡«ï¼‰")
             .setStyle(TextInputStyle.Paragraph)
             .setRequired(false)
         )
@@ -2507,7 +2511,7 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // ---------------------------------------------------------
-    // 提交陪玩订单 Modal（创建 ticket 频道）
+    // æäº¤é™ªçŽ©è®¢å• Modalï¼ˆåˆ›å»º ticket é¢‘é“ï¼‰
     // ---------------------------------------------------------
     if (
       interaction.isModalSubmit() &&
@@ -2519,16 +2523,16 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
       const game = interaction.fields.getTextInputValue("game");
       const time = interaction.fields.getTextInputValue("time");
       const mode = interaction.fields.getTextInputValue("mode");
-      const extra = interaction.fields.getTextInputValue("extra") || "无";
+      const extra = interaction.fields.getTextInputValue("extra") || "æ— ";
 
-      // 检查用户现有的ticket数量（通过topic中的user.id）
+      // æ£€æŸ¥ç”¨æˆ·çŽ°æœ‰çš„ticketæ•°é‡ï¼ˆé€šè¿‡topicä¸­çš„user.idï¼‰
       const userTickets = guild.channels.cache.filter(
         (c) => c.topic && c.topic.startsWith(`ticket_user:${user.id}`)
       );
 
       if (userTickets.size >= 5) {
         await interaction.reply({
-          content: "❗ 你已经有5个进行中的陪玩工单，无法继续创建。请先完成其他工单后再提交新的～",
+          content: "â— ä½ å·²ç»æœ‰5ä¸ªè¿›è¡Œä¸­çš„é™ªçŽ©å·¥å•ï¼Œæ— æ³•ç»§ç»­åˆ›å»ºã€‚è¯·å…ˆå®Œæˆå…¶ä»–å·¥å•åŽå†æäº¤æ–°çš„ï½ž",
           ephemeral: true,
         });
         return;
@@ -2569,77 +2573,77 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
 
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("🎮 陪玩订单详情")
-        .setDescription(`${sep()}\n你的订单已记录，我们会温柔地安排陪玩～\n${sep()}\n\n📋 **订单信息**`)
+        .setTitle("ðŸŽ® é™ªçŽ©è®¢å•è¯¦æƒ…")
+        .setDescription(`${sep()}\nä½ çš„è®¢å•å·²è®°å½•ï¼Œæˆ‘ä»¬ä¼šæ¸©æŸ”åœ°å®‰æŽ’é™ªçŽ©ï½ž\n${sep()}\n\nðŸ“‹ **è®¢å•ä¿¡æ¯**`)
         .setThumbnail("https://cdn.discordapp.com/attachments/1433987480524165213/1440965791313952868/Generated_Image_November_20_2025_-_1_45PM.png?ex=69201378&is=691ec1f8&hm=2ba4de5f511070f09474d79525165cc9ce3a552b90766c65963546a58710f6a7&")
         .addFields(
-          { name: "👤 用户", value: `**${user}**`, inline: true },
-          { name: "🎮 游戏", value: game, inline: true },
-          { name: "⏰ 预约时间", value: time, inline: true },
-          { name: "🎯 模式", value: mode, inline: true },
-          { name: "✨ 特别需求", value: extra || "无", inline: false },
-          { name: "⌚ 创建时间", value: new Date().toLocaleString('zh-CN'), inline: true },
-          { name: "📊 订单状态", value: "🔔 待派单", inline: true }
+          { name: "ðŸ‘¤ ç”¨æˆ·", value: `**${user}**`, inline: true },
+          { name: "ðŸŽ® æ¸¸æˆ", value: game, inline: true },
+          { name: "â° é¢„çº¦æ—¶é—´", value: time, inline: true },
+          { name: "ðŸŽ¯ æ¨¡å¼", value: mode, inline: true },
+          { name: "âœ¨ ç‰¹åˆ«éœ€æ±‚", value: extra || "æ— ", inline: false },
+          { name: "âŒš åˆ›å»ºæ—¶é—´", value: new Date().toLocaleString('zh-CN'), inline: true },
+          { name: "ðŸ“Š è®¢å•çŠ¶æ€", value: "ðŸ”” å¾…æ´¾å•", inline: true }
         )
-        .setFooter({ text: "陪玩后宫 • 感谢你的信任 💗" })
+        .setFooter({ text: "é™ªçŽ©åŽå®« â€¢ æ„Ÿè°¢ä½ çš„ä¿¡ä»» ðŸ’—" })
         .setTimestamp();
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("assign_order")
-          .setLabel("📋 派单")
+          .setLabel("ðŸ“‹ æ´¾å•")
           .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
           .setCustomId("renew_order")
-          .setLabel("🔄 续单")
+          .setLabel("ðŸ”„ ç»­å•")
           .setStyle(ButtonStyle.Success),
         new ButtonBuilder()
           .setCustomId("close_ticket")
-          .setLabel("🔒 关闭工单")
+          .setLabel("ðŸ”’ å…³é—­å·¥å•")
           .setStyle(ButtonStyle.Danger)
       );
 
       await ticketChannel.send({
-        content: `<@&${config.adminRoleId}> <@&${SUPPORT_SECOND_ROLE_ID}> 📢 新陪玩工单来自 ${user}`,
+        content: `<@&${config.adminRoleId}> <@&${SUPPORT_SECOND_ROLE_ID}> ðŸ“¢ æ–°é™ªçŽ©å·¥å•æ¥è‡ª ${user}`,
         embeds: [embed],
         components: [row],
       });
 
-      // 🕐 设置自动关闭：24小时后自动关闭ticket
+      // ðŸ• è®¾ç½®è‡ªåŠ¨å…³é—­ï¼š24å°æ—¶åŽè‡ªåŠ¨å…³é—­ticket
       const ticketKey = ticketChannel.id;
       const timeoutId = setTimeout(async () => {
         try {
           const channel = await client.channels.fetch(ticketKey).catch(() => null);
           if (channel) {
             await channel.send({
-              content: "⏰ 工单已运行24小时，现已自动关闭。如有新需求请重新提交～",
+              content: "â° å·¥å•å·²è¿è¡Œ24å°æ—¶ï¼ŒçŽ°å·²è‡ªåŠ¨å…³é—­ã€‚å¦‚æœ‰æ–°éœ€æ±‚è¯·é‡æ–°æäº¤ï½ž",
             });
             setTimeout(() => {
-              // 【修复问题 20】检查 Channel 是否仍然存在
+              // ã€ä¿®å¤é—®é¢˜ 20ã€‘æ£€æŸ¥ Channel æ˜¯å¦ä»ç„¶å­˜åœ¨
               try {
                 channel.delete().catch((err) => {
                   if (err.code !== 10003) { // 10003: Unknown channel
-                    console.warn("⚠️  删除 Ticket Channel 失败:", err.message);
+                    console.warn("âš ï¸  åˆ é™¤ Ticket Channel å¤±è´¥:", err.message);
                   }
                 });
               } catch (err) {
-                console.error("❌ Ticket 频道删除异常:", err.message);
+                console.error("âŒ Ticket é¢‘é“åˆ é™¤å¼‚å¸¸:", err.message);
               }
             }, 2000);
             ticketTimers.delete(ticketKey);
           }
         } catch (err) {
-          console.error("❌ 自动关闭ticket错误:", err.message);
-          // 确保清理 timer，即使出错
+          console.error("âŒ è‡ªåŠ¨å…³é—­ticketé”™è¯¯:", err.message);
+          // ç¡®ä¿æ¸…ç† timerï¼Œå³ä½¿å‡ºé”™
           ticketTimerCleanup(ticketKey);
         }
       }, TICKET_TIMEOUT);
 
-      // 保存timer ID方便取消（如果手动关闭）
+      // ä¿å­˜timer IDæ–¹ä¾¿å–æ¶ˆï¼ˆå¦‚æžœæ‰‹åŠ¨å…³é—­ï¼‰
       ticketTimers.set(ticketKey, timeoutId);
 
       await interaction.reply({
-        content: `✨ 你的陪玩工单已创建：${ticketChannel}，我们会尽快安排～`,
+        content: `âœ¨ ä½ çš„é™ªçŽ©å·¥å•å·²åˆ›å»ºï¼š${ticketChannel}ï¼Œæˆ‘ä»¬ä¼šå°½å¿«å®‰æŽ’ï½ž`,
         ephemeral: true,
       });
 
@@ -2647,16 +2651,16 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // ---------------------------------------------------------
-    // 点击「📋 派单」按钮 → 打开派单 Modal
+    // ç‚¹å‡»ã€ŒðŸ“‹ æ´¾å•ã€æŒ‰é’® â†’ æ‰“å¼€æ´¾å• Modal
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "assign_order") {
-      // 只允许管理员或拥有指定管理员角色的成员派单
+      // åªå…è®¸ç®¡ç†å‘˜æˆ–æ‹¥æœ‰æŒ‡å®šç®¡ç†å‘˜è§’è‰²çš„æˆå‘˜æ´¾å•
       const member =
         interaction.guild.members.cache.get(interaction.user.id) ||
         (await interaction.guild.members.fetch(interaction.user.id).catch(() => null));
 
       if (!member) {
-        await interaction.reply({ content: "❌ 无法验证你的权限。", ephemeral: true });
+        await interaction.reply({ content: "âŒ æ— æ³•éªŒè¯ä½ çš„æƒé™ã€‚", ephemeral: true });
         return;
       }
 
@@ -2665,44 +2669,44 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
         member.roles.cache.has(config.adminRoleId);
 
       if (!isAdmin) {
-        await interaction.reply({ content: "❌ 抱歉，只有管理员可以进行派单操作。", ephemeral: true });
+        await interaction.reply({ content: "âŒ æŠ±æ­‰ï¼Œåªæœ‰ç®¡ç†å‘˜å¯ä»¥è¿›è¡Œæ´¾å•æ“ä½œã€‚", ephemeral: true });
         return;
       }
 
       const modal = new ModalBuilder()
         .setCustomId("assignForm")
-        .setTitle("📋 派单详情");
+        .setTitle("ðŸ“‹ æ´¾å•è¯¦æƒ…");
 
       modal.addComponents(
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("player")
-            .setLabel("🆔陪玩用户名")
-            .setPlaceholder("例如：小雪 / 小布丁")
+            .setLabel("ðŸ†”é™ªçŽ©ç”¨æˆ·å")
+            .setPlaceholder("ä¾‹å¦‚ï¼šå°é›ª / å°å¸ƒä¸")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("game")
-            .setLabel("🎮游戏名称")
-            .setPlaceholder("例如：Valorant / CS2 / Apex")
+            .setLabel("ðŸŽ®æ¸¸æˆåç§°")
+            .setPlaceholder("ä¾‹å¦‚ï¼šValorant / CS2 / Apex")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("duration")
-            .setLabel("⏰时长")
-            .setPlaceholder("例如：2 小时 / 3 局")
+            .setLabel("â°æ—¶é•¿")
+            .setPlaceholder("ä¾‹å¦‚ï¼š2 å°æ—¶ / 3 å±€")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("price")
-            .setLabel("💲价格 (RM)")
-            .setPlaceholder("例如：20 / 40 / 60")
+            .setLabel("ðŸ’²ä»·æ ¼ (RM)")
+            .setPlaceholder("ä¾‹å¦‚ï¼š20 / 40 / 60")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         )
@@ -2713,7 +2717,7 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // ---------------------------------------------------------
-    // 派单 Modal 提交（新派单记录）
+    // æ´¾å• Modal æäº¤ï¼ˆæ–°æ´¾å•è®°å½•ï¼‰
     // ---------------------------------------------------------
     if (
       interaction.isModalSubmit() &&
@@ -2725,17 +2729,17 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
       const topic = channel.topic || "";
       const customer = topic.startsWith("ticket_user:")
         ? topic.split("ticket_user:")[1]
-        : "未知";
+        : "æœªçŸ¥";
 
       const player = interaction.fields.getTextInputValue("player");
       const game = interaction.fields.getTextInputValue("game");
       const duration = interaction.fields.getTextInputValue("duration");
       const price = parsePrice(interaction.fields.getTextInputValue("price"));
 
-      // ⭐ 随机生成单号
+      // â­ éšæœºç”Ÿæˆå•å·
       const orderNo = generateOrderNumber();
 
-      // 保存到数据库
+      // ä¿å­˜åˆ°æ•°æ®åº“
       try {
         await db.addOrder({
           type: "dispatch",
@@ -2749,52 +2753,52 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
           orderNo,
         });
       } catch (err) {
-        console.error("保存派单到数据库失败：", err);
+        console.error("ä¿å­˜æ´¾å•åˆ°æ•°æ®åº“å¤±è´¥ï¼š", err);
       }
 
-      // 更新统计
+      // æ›´æ–°ç»Ÿè®¡
       try {
         const stats = await db.getStats();
         await db.updateStats(stats.totalOrders + 1, stats.totalRevenue + Number(price));
       } catch (err) {
-        console.error("更新统计失败：", err);
+        console.error("æ›´æ–°ç»Ÿè®¡å¤±è´¥ï¼š", err);
       }
 
-      // 📱 自动发送派单到 Telegram（仅第一个群）
-      const telegramOrderMsg = `<b>📋 新的派单记录</b>
-━━━━━━━━━━━━━━━━━━
-<b>🙋 派单员:</b> ${assigner}
-<b>🧚 陪玩员:</b> ${player}
-<b>🎮 游戏:</b> ${game}
-<b>⏰ 时长:</b> ${duration}
-<b>💰 价格:</b> RM ${price}
-<b>📦 单号:</b> ${orderNo}
-<b>📅 时间:</b> ${new Date().toLocaleString("zh-CN")}
-━━━━━━━━━━━━━━━━━━`;
+      // ðŸ“± è‡ªåŠ¨å‘é€æ´¾å•åˆ° Telegramï¼ˆä»…ç¬¬ä¸€ä¸ªç¾¤ï¼‰
+      const telegramOrderMsg = `<b>ðŸ“‹ æ–°çš„æ´¾å•è®°å½•</b>
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+<b>ðŸ™‹ æ´¾å•å‘˜:</b> ${assigner}
+<b>ðŸ§š é™ªçŽ©å‘˜:</b> ${player}
+<b>ðŸŽ® æ¸¸æˆ:</b> ${game}
+<b>â° æ—¶é•¿:</b> ${duration}
+<b>ðŸ’° ä»·æ ¼:</b> RM ${price}
+<b>ðŸ“¦ å•å·:</b> ${orderNo}
+<b>ðŸ“… æ—¶é—´:</b> ${new Date().toLocaleString("zh-CN")}
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”`;
       await sendTelegramReport(config.telegramChatId, telegramOrderMsg, config.telegramMessageThreadId).catch(() => {});
 
-      // 新派单记录 embed（粉色可爱风）
+      // æ–°æ´¾å•è®°å½• embedï¼ˆç²‰è‰²å¯çˆ±é£Žï¼‰
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("📋 新派单记录～【派单确认】")
-        .setDescription(`${sep()}\n✨ 新派单已登记，我们会温柔地跟进～\n${sep()}\n\n👥 **派单详情**`)
+        .setTitle("ðŸ“‹ æ–°æ´¾å•è®°å½•ï½žã€æ´¾å•ç¡®è®¤ã€‘")
+        .setDescription(`${sep()}\nâœ¨ æ–°æ´¾å•å·²ç™»è®°ï¼Œæˆ‘ä»¬ä¼šæ¸©æŸ”åœ°è·Ÿè¿›ï½ž\n${sep()}\n\nðŸ‘¥ **æ´¾å•è¯¦æƒ…**`)
         .addFields(
-          { name: "🙋‍♂️ 派单员", value: `**${assigner}**`, inline: true },
-          { name: "🧚‍♀️ 陪玩员", value: `**${player}**`, inline: true },
-          { name: "🎮 游戏", value: game, inline: true },
-          { name: "⏰ 时长", value: duration, inline: true },
-          { name: "💰 价格", value: `**RM ${price}**`, inline: true },
-          { name: "🆔 客户ID", value: customer, inline: true },
-          { name: "📦 单号", value: `\`\`\`${orderNo}\`\`\``, inline: false },
-          { name: "⌚ 派单时间", value: new Date().toLocaleString('zh-CN'), inline: true },
-          { name: "✅ 单据状态", value: "✔️ 已确认", inline: true }
+          { name: "ðŸ™‹â€â™‚ï¸ æ´¾å•å‘˜", value: `**${assigner}**`, inline: true },
+          { name: "ðŸ§šâ€â™€ï¸ é™ªçŽ©å‘˜", value: `**${player}**`, inline: true },
+          { name: "ðŸŽ® æ¸¸æˆ", value: game, inline: true },
+          { name: "â° æ—¶é•¿", value: duration, inline: true },
+          { name: "ðŸ’° ä»·æ ¼", value: `**RM ${price}**`, inline: true },
+          { name: "ðŸ†” å®¢æˆ·ID", value: customer, inline: true },
+          { name: "ðŸ“¦ å•å·", value: `\`\`\`${orderNo}\`\`\``, inline: false },
+          { name: "âŒš æ´¾å•æ—¶é—´", value: new Date().toLocaleString('zh-CN'), inline: true },
+          { name: "âœ… å•æ®çŠ¶æ€", value: "âœ”ï¸ å·²ç¡®è®¤", inline: true }
         )
         .setFooter({
-          text: "✅ 已保存至SQLite数据库 • 谢谢你的配合 💗",
+          text: "âœ… å·²ä¿å­˜è‡³SQLiteæ•°æ®åº“ â€¢ è°¢è°¢ä½ çš„é…åˆ ðŸ’—",
         })
         .setTimestamp();
 
-      // 【禁用】派单记录不需要发去LOG_CHANNEL_ID
+      // ã€ç¦ç”¨ã€‘æ´¾å•è®°å½•ä¸éœ€è¦å‘åŽ»LOG_CHANNEL_ID
       // const logChannel =
       //   guild.channels.cache.get(LOG_CHANNEL_ID) ||
       //   (await guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null));
@@ -2802,28 +2806,28 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
       //   await logChannel.send({ embeds: [embed] });
       // }
 
-      // 【新增】自动发送到报备派单频道
+      // ã€æ–°å¢žã€‘è‡ªåŠ¨å‘é€åˆ°æŠ¥å¤‡æ´¾å•é¢‘é“
       try {
         const reportDispatchChannel = guild.channels.cache.get(REPORT_DISPATCH_CHANNEL_ID) ||
           (await guild.channels.fetch(REPORT_DISPATCH_CHANNEL_ID).catch(() => null));
         if (reportDispatchChannel && reportDispatchChannel.isTextBased()) {
           await reportDispatchChannel.send({ embeds: [embed] });
-          console.log(`✅ 派单已发送到频道: ${REPORT_DISPATCH_CHANNEL_ID}`);
+          console.log(`âœ… æ´¾å•å·²å‘é€åˆ°é¢‘é“: ${REPORT_DISPATCH_CHANNEL_ID}`);
         } else {
-          console.warn(`⚠️ 报备派单频道不存在或非文本频道: ${REPORT_DISPATCH_CHANNEL_ID}`);
+          console.warn(`âš ï¸ æŠ¥å¤‡æ´¾å•é¢‘é“ä¸å­˜åœ¨æˆ–éžæ–‡æœ¬é¢‘é“: ${REPORT_DISPATCH_CHANNEL_ID}`);
         }
       } catch (err) {
-        console.error("❌ 发送派单到频道失败：", err.message);
+        console.error("âŒ å‘é€æ´¾å•åˆ°é¢‘é“å¤±è´¥ï¼š", err.message);
       }
 
-      // 检查channel是否存在（可能已被删除）
+      // æ£€æŸ¥channelæ˜¯å¦å­˜åœ¨ï¼ˆå¯èƒ½å·²è¢«åˆ é™¤ï¼‰
       if (interaction.channel) {
         await interaction.reply({
-          content: "✅ 派单已成功记录，感谢你～",
+          content: "âœ… æ´¾å•å·²æˆåŠŸè®°å½•ï¼Œæ„Ÿè°¢ä½ ï½ž",
           ephemeral: true,
         }).catch(() => {
-          // 如果interaction失效，忽略错误
-          console.log("派单modal reply失败，但数据已保存");
+          // å¦‚æžœinteractionå¤±æ•ˆï¼Œå¿½ç•¥é”™è¯¯
+          console.log("æ´¾å•modal replyå¤±è´¥ï¼Œä½†æ•°æ®å·²ä¿å­˜");
         });
       }
 
@@ -2831,51 +2835,51 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // ---------------------------------------------------------
-    // 点击「🔄 续单」按钮 → 打开续单 Modal
+    // ç‚¹å‡»ã€ŒðŸ”„ ç»­å•ã€æŒ‰é’® â†’ æ‰“å¼€ç»­å• Modal
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "renew_order") {
       const modal = new ModalBuilder()
         .setCustomId("renewForm")
-        .setTitle("🔄 续单详情");
+        .setTitle("ðŸ”„ ç»­å•è¯¦æƒ…");
 
       modal.addComponents(
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("player")
-            .setLabel("🆔陪玩用户名")
-            .setPlaceholder("例如：小雪 / 小布丁")
+            .setLabel("ðŸ†”é™ªçŽ©ç”¨æˆ·å")
+            .setPlaceholder("ä¾‹å¦‚ï¼šå°é›ª / å°å¸ƒä¸")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("game")
-            .setLabel("🎮游戏名称")
-            .setPlaceholder("例如：Valorant / CS2 / Apex")
+            .setLabel("ðŸŽ®æ¸¸æˆåç§°")
+            .setPlaceholder("ä¾‹å¦‚ï¼šValorant / CS2 / Apex")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("duration")
-            .setLabel("⏰时长")
-            .setPlaceholder("例如：2 小时 / 3 局")
+            .setLabel("â°æ—¶é•¿")
+            .setPlaceholder("ä¾‹å¦‚ï¼š2 å°æ—¶ / 3 å±€")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("price")
-            .setLabel("💲价格 (RM)")
-            .setPlaceholder("例如：20 / 40 / 60")
+            .setLabel("ðŸ’²ä»·æ ¼ (RM)")
+            .setPlaceholder("ä¾‹å¦‚ï¼š20 / 40 / 60")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("original_order")
-            .setLabel("📦原单号（续单用）")
-            .setPlaceholder("输入原单号，如没有可留空")
+            .setLabel("ðŸ“¦åŽŸå•å·ï¼ˆç»­å•ç”¨ï¼‰")
+            .setPlaceholder("è¾“å…¥åŽŸå•å·ï¼Œå¦‚æ²¡æœ‰å¯ç•™ç©º")
             .setStyle(TextInputStyle.Short)
             .setRequired(false)
         )
@@ -2886,7 +2890,7 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // ---------------------------------------------------------
-    // 续单 Modal 提交（新续单记录）
+    // ç»­å• Modal æäº¤ï¼ˆæ–°ç»­å•è®°å½•ï¼‰
     // ---------------------------------------------------------
     if (
       interaction.isModalSubmit() &&
@@ -2898,7 +2902,7 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
       const topic = channel.topic || "";
       const customer = topic.startsWith("ticket_user:")
         ? topic.split("ticket_user:")[1]
-        : "未知";
+        : "æœªçŸ¥";
 
       const player = interaction.fields.getTextInputValue("player");
       const game = interaction.fields.getTextInputValue("game");
@@ -2906,10 +2910,10 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
       const price = parsePrice(interaction.fields.getTextInputValue("price"));
       const originalOrder = interaction.fields.getTextInputValue("original_order");
 
-      // ⭐ 随机生成新单号
+      // â­ éšæœºç”Ÿæˆæ–°å•å·
       const orderNo = generateOrderNumber();
 
-      // 保存至 SQLite 数据库
+      // ä¿å­˜è‡³ SQLite æ•°æ®åº“
       try {
         await db.addOrder({
           type: "renew_dispatch",
@@ -2923,53 +2927,53 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
           orderNo,
         });
       } catch (err) {
-        console.error("保存续单到数据库失败：", err);
+        console.error("ä¿å­˜ç»­å•åˆ°æ•°æ®åº“å¤±è´¥ï¼š", err);
       }
 
-      // 更新统计
+      // æ›´æ–°ç»Ÿè®¡
       try {
         const stats = await db.getStats();
         await db.updateStats(stats.totalOrders + 1, stats.totalRevenue + Number(price));
       } catch (err) {
-        console.error("更新统计失败：", err);
+        console.error("æ›´æ–°ç»Ÿè®¡å¤±è´¥ï¼š", err);
       }
 
-      // 📱 自动发送续单到 Telegram
-      const telegramRenewMsg = `<b>🔄 新的续单记录</b>
-━━━━━━━━━━━━━━━━━━
-<b>🙋 派单员:</b> ${assigner}
-<b>🧚 陪玩员:</b> ${player}
-<b>🎮 游戏:</b> ${game}
-<b>⏰ 时长:</b> ${duration}
-<b>💰 价格:</b> RM ${price}
-<b>📦 新单号:</b> ${orderNo}
-<b>📦 原单号:</b> ${originalOrder || "未记录"}
-<b>👤 客户ID:</b> ${customer}
-<b>📅 时间:</b> ${new Date().toLocaleString("zh-CN")}
-━━━━━━━━━━━━━━━━━━`;
+      // ðŸ“± è‡ªåŠ¨å‘é€ç»­å•åˆ° Telegram
+      const telegramRenewMsg = `<b>ðŸ”„ æ–°çš„ç»­å•è®°å½•</b>
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+<b>ðŸ™‹ æ´¾å•å‘˜:</b> ${assigner}
+<b>ðŸ§š é™ªçŽ©å‘˜:</b> ${player}
+<b>ðŸŽ® æ¸¸æˆ:</b> ${game}
+<b>â° æ—¶é•¿:</b> ${duration}
+<b>ðŸ’° ä»·æ ¼:</b> RM ${price}
+<b>ðŸ“¦ æ–°å•å·:</b> ${orderNo}
+<b>ðŸ“¦ åŽŸå•å·:</b> ${originalOrder || "æœªè®°å½•"}
+<b>ðŸ‘¤ å®¢æˆ·ID:</b> ${customer}
+<b>ðŸ“… æ—¶é—´:</b> ${new Date().toLocaleString("zh-CN")}
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”`;
       await sendTelegramReport(config.telegramChatId, telegramRenewMsg, config.telegramMessageThreadId).catch(() => {});
 
-      // 📊 发送续单记录到日志频道
+      // ðŸ“Š å‘é€ç»­å•è®°å½•åˆ°æ—¥å¿—é¢‘é“
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("🔄 新续单记录")
-        .setDescription(`${sep()}\n续单已登记，我们会温柔地跟进～\n${sep()}`)
+        .setTitle("ðŸ”„ æ–°ç»­å•è®°å½•")
+        .setDescription(`${sep()}\nç»­å•å·²ç™»è®°ï¼Œæˆ‘ä»¬ä¼šæ¸©æŸ”åœ°è·Ÿè¿›ï½ž\n${sep()}`)
         .addFields(
-          { name: "🙋‍♂️ 派单员", value: assigner, inline: true },
-          { name: "🧚‍♀️ 陪玩员", value: player, inline: true },
-          { name: "🎮 游戏", value: game, inline: true },
-          { name: "⏰ 时长", value: duration, inline: true },
-          { name: "💰 价格", value: `RM ${price}`, inline: true },
-          { name: "🆔 客户ID", value: customer, inline: true },
-          { name: "📦 新单号", value: `📦 ${orderNo}`, inline: true },
-          { name: "📦 原单号", value: `📦 ${originalOrder || "未记录"}`, inline: true }
+          { name: "ðŸ™‹â€â™‚ï¸ æ´¾å•å‘˜", value: assigner, inline: true },
+          { name: "ðŸ§šâ€â™€ï¸ é™ªçŽ©å‘˜", value: player, inline: true },
+          { name: "ðŸŽ® æ¸¸æˆ", value: game, inline: true },
+          { name: "â° æ—¶é•¿", value: duration, inline: true },
+          { name: "ðŸ’° ä»·æ ¼", value: `RM ${price}`, inline: true },
+          { name: "ðŸ†” å®¢æˆ·ID", value: customer, inline: true },
+          { name: "ðŸ“¦ æ–°å•å·", value: `ðŸ“¦ ${orderNo}`, inline: true },
+          { name: "ðŸ“¦ åŽŸå•å·", value: `ðŸ“¦ ${originalOrder || "æœªè®°å½•"}`, inline: true }
         )
         .setFooter({
-          text: "✅ 已保存至SQLite数据库 • 谢谢你的配合 💗",
+          text: "âœ… å·²ä¿å­˜è‡³SQLiteæ•°æ®åº“ â€¢ è°¢è°¢ä½ çš„é…åˆ ðŸ’—",
         })
         .setTimestamp();
 
-      // 【禁用】续单记录不需要发去LOG_CHANNEL_ID
+      // ã€ç¦ç”¨ã€‘ç»­å•è®°å½•ä¸éœ€è¦å‘åŽ»LOG_CHANNEL_ID
       // const logChannel =
       //   guild.channels.cache.get(LOG_CHANNEL_ID) ||
       //   (await guild.channels.fetch(LOG_CHANNEL_ID).catch(() => null));
@@ -2977,14 +2981,14 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
       //   await logChannel.send({ embeds: [embed] });
       // }
 
-      // 检查channel是否存在（可能已被删除）
+      // æ£€æŸ¥channelæ˜¯å¦å­˜åœ¨ï¼ˆå¯èƒ½å·²è¢«åˆ é™¤ï¼‰
       if (interaction.channel) {
         await interaction.reply({
-          content: "✅ 续单已成功记录，感谢你～",
+          content: "âœ… ç»­å•å·²æˆåŠŸè®°å½•ï¼Œæ„Ÿè°¢ä½ ï½ž",
           ephemeral: true,
         }).catch(() => {
-          // 如果interaction失效，忽略错误
-          console.log("续单modal reply失败，但数据已保存");
+          // å¦‚æžœinteractionå¤±æ•ˆï¼Œå¿½ç•¥é”™è¯¯
+          console.log("ç»­å•modal replyå¤±è´¥ï¼Œä½†æ•°æ®å·²ä¿å­˜");
         });
       }
 
@@ -2992,20 +2996,20 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // ---------------------------------------------------------
-    // 关闭陪玩工单
+    // å…³é—­é™ªçŽ©å·¥å•
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "close_ticket") {
       const channel = interaction.channel;
       const ticketKey = channel.id;
 
-      // 清除自动关闭timer
+      // æ¸…é™¤è‡ªåŠ¨å…³é—­timer
       if (ticketTimers.has(ticketKey)) {
         clearTimeout(ticketTimers.get(ticketKey));
         ticketTimers.delete(ticketKey);
       }
 
       await interaction.reply({
-        content: "🔒 工单将在 5 秒后关闭。感谢你的配合～",
+        content: "ðŸ”’ å·¥å•å°†åœ¨ 5 ç§’åŽå…³é—­ã€‚æ„Ÿè°¢ä½ çš„é…åˆï½ž",
         ephemeral: true,
       });
 
@@ -3017,7 +3021,7 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // ---------------------------------------------------------
-    // /record（手动更新/发送统计 embed）
+    // /recordï¼ˆæ‰‹åŠ¨æ›´æ–°/å‘é€ç»Ÿè®¡ embedï¼‰
     // ---------------------------------------------------------
     if (
       interaction.isChatInputCommand() &&
@@ -3028,7 +3032,7 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
         (await interaction.guild.members.fetch(interaction.user.id).catch(() => null));
 
       if (!member) {
-        await interaction.reply({ content: "❌ 无法验证你的权限。", ephemeral: true });
+        await interaction.reply({ content: "âŒ æ— æ³•éªŒè¯ä½ çš„æƒé™ã€‚", ephemeral: true });
         return;
       }
 
@@ -3037,23 +3041,23 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
         member.roles.cache.has(config.adminRoleId);
 
       if (!isAdmin) {
-        await interaction.reply({ content: "❌ 仅管理员可执行此命令。", ephemeral: true });
+        await interaction.reply({ content: "âŒ ä»…ç®¡ç†å‘˜å¯æ‰§è¡Œæ­¤å‘½ä»¤ã€‚", ephemeral: true });
         return;
       }
 
       try {
         await updateStatsSummaryEmbed(interaction.guild).catch(() => {});
-        await interaction.reply({ content: "✅ 已更新/发送派单统计 embed。", ephemeral: true });
+        await interaction.reply({ content: "âœ… å·²æ›´æ–°/å‘é€æ´¾å•ç»Ÿè®¡ embedã€‚", ephemeral: true });
       } catch (err) {
-        console.error("/record 更新统计失败:", err);
-        await interaction.reply({ content: "❌ 更新统计时出错。", ephemeral: true });
+        console.error("/record æ›´æ–°ç»Ÿè®¡å¤±è´¥:", err);
+        await interaction.reply({ content: "âŒ æ›´æ–°ç»Ÿè®¡æ—¶å‡ºé”™ã€‚", ephemeral: true });
       }
 
       return;
     }
 
     // ---------------------------------------------------------
-    // /db（数据库管理中心 - 综合控制面板）
+    // /dbï¼ˆæ•°æ®åº“ç®¡ç†ä¸­å¿ƒ - ç»¼åˆæŽ§åˆ¶é¢æ¿ï¼‰
     // ---------------------------------------------------------
     if (
       interaction.isChatInputCommand() &&
@@ -3064,7 +3068,7 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
         (await interaction.guild.members.fetch(interaction.user.id).catch(() => null));
 
       if (!member) {
-        await interaction.reply({ content: "❌ 无法验证你的权限。", ephemeral: true });
+        await interaction.reply({ content: "âŒ æ— æ³•éªŒè¯ä½ çš„æƒé™ã€‚", ephemeral: true });
         return;
       }
 
@@ -3073,7 +3077,7 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
         member.roles.cache.has(config.adminRoleId);
 
       if (!isAdmin) {
-        await interaction.reply({ content: "❌ 仅管理员可执行此命令。", ephemeral: true });
+        await interaction.reply({ content: "âŒ ä»…ç®¡ç†å‘˜å¯æ‰§è¡Œæ­¤å‘½ä»¤ã€‚", ephemeral: true });
         return;
       }
 
@@ -3081,9 +3085,9 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
         const dbPanel = await buildDbPanelEmbed();
         await interaction.reply(dbPanel);
       } catch (err) {
-        console.error("/db 命令错误:", err);
+        console.error("/db å‘½ä»¤é”™è¯¯:", err);
         await interaction.reply({
-          content: "❌ 获取数据库信息失败。",
+          content: "âŒ èŽ·å–æ•°æ®åº“ä¿¡æ¯å¤±è´¥ã€‚",
           ephemeral: true,
         });
       }
@@ -3092,280 +3096,280 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // ---------------------------------------------------------
-    // /db 按钮处理器 - db_info
+    // /db æŒ‰é’®å¤„ç†å™¨ - db_info
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "db_info") {
       try {
-        console.log("[db_info] 开始处理...");
+        console.log("[db_info] å¼€å§‹å¤„ç†...");
         await interaction.deferReply({ ephemeral: true });
 
         const stats = await db.getStats();
         const allOrders = await db.getAllOrders();
         const fs = require("fs");
         const stat = fs.statSync("./data.db");
-        console.log("[db_info] 数据获取成功");
+        console.log("[db_info] æ•°æ®èŽ·å–æˆåŠŸ");
 
         const embed = new EmbedBuilder()
           .setColor(0xff99cc)
-          .setTitle("📊 数据库详细信息")
+          .setTitle("ðŸ“Š æ•°æ®åº“è¯¦ç»†ä¿¡æ¯")
           .setFields(
             {
-              name: "📈 统计数据",
-              value: `\`\`\`\n总订单数: ${stats.totalOrders || 0}\n总收入: RM ${(stats.totalRevenue || 0).toFixed(2)}\n平均单价: RM ${stats.totalOrders > 0 ? (stats.totalRevenue / stats.totalOrders).toFixed(2) : "0.00"}\n\`\`\``,
+              name: "ðŸ“ˆ ç»Ÿè®¡æ•°æ®",
+              value: `\`\`\`\næ€»è®¢å•æ•°: ${stats.totalOrders || 0}\næ€»æ”¶å…¥: RM ${(stats.totalRevenue || 0).toFixed(2)}\nå¹³å‡å•ä»·: RM ${stats.totalOrders > 0 ? (stats.totalRevenue / stats.totalOrders).toFixed(2) : "0.00"}\n\`\`\``,
               inline: false,
             },
             {
-              name: "💾 数据库状态",
-              value: `\`\`\`\n记录总数: ${allOrders.length}\n数据库大小: ${(stat.size / 1024).toFixed(2)} KB\n最后更新: ${stats.lastUpdated || "未知"}\n文件位置: ./data.db\n\`\`\``,
+              name: "ðŸ’¾ æ•°æ®åº“çŠ¶æ€",
+              value: `\`\`\`\nè®°å½•æ€»æ•°: ${allOrders.length}\næ•°æ®åº“å¤§å°: ${(stat.size / 1024).toFixed(2)} KB\næœ€åŽæ›´æ–°: ${stats.lastUpdated || "æœªçŸ¥"}\næ–‡ä»¶ä½ç½®: ./data.db\n\`\`\``,
               inline: false,
             }
           )
-          .setFooter({ text: "刷新数据: 点击主菜单的 🔄 按钮" });
+          .setFooter({ text: "åˆ·æ–°æ•°æ®: ç‚¹å‡»ä¸»èœå•çš„ ðŸ”„ æŒ‰é’®" });
 
         await interaction.editReply({ embeds: [embed] });
-        console.log("[db_info] 完成");
+        console.log("[db_info] å®Œæˆ");
       } catch (err) {
-        console.error("db_info 错误:", err);
+        console.error("db_info é”™è¯¯:", err);
         try {
           await interaction.editReply({
-            content: `❌ 获取信息失败: ${err.message}`,
+            content: `âŒ èŽ·å–ä¿¡æ¯å¤±è´¥: ${err.message}`,
           });
         } catch (e) {
-          console.error("db_info 回复失败:", e);
+          console.error("db_info å›žå¤å¤±è´¥:", e);
         }
       }
       return;
     }
 
     // ---------------------------------------------------------
-    // /db 按钮处理器 - db_edit
+    // /db æŒ‰é’®å¤„ç†å™¨ - db_edit
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "db_edit") {
       try {
-        console.log("[db_edit] 开始处理...");
+        console.log("[db_edit] å¼€å§‹å¤„ç†...");
         await interaction.deferReply({ ephemeral: true });
 
         const allOrders = await db.getAllOrders();
-        console.log("[db_edit] 获取订单数:", allOrders.length);
+        console.log("[db_edit] èŽ·å–è®¢å•æ•°:", allOrders.length);
 
         if (allOrders.length === 0) {
           await interaction.editReply({
-            content: "📋 目前没有订单可编辑。",
+            content: "ðŸ“‹ ç›®å‰æ²¡æœ‰è®¢å•å¯ç¼–è¾‘ã€‚",
           });
           return;
         }
 
-        // 显示最近的 5 条订单
+        // æ˜¾ç¤ºæœ€è¿‘çš„ 5 æ¡è®¢å•
         const recent = allOrders.slice(0, 5);
-        let orderList = "```\n【可编辑的最近订单】\n\n";
+        let orderList = "```\nã€å¯ç¼–è¾‘çš„æœ€è¿‘è®¢å•ã€‘\n\n";
 
         recent.forEach((order, idx) => {
-          orderList += `[${idx + 1}] ID:${order.id}\n    玩家: ${order.player || "未填"}\n    金额: RM ${order.amount || 0}\n\n`;
+          orderList += `[${idx + 1}] ID:${order.id}\n    çŽ©å®¶: ${order.player || "æœªå¡«"}\n    é‡‘é¢: RM ${order.amount || 0}\n\n`;
         });
 
         orderList += "```";
 
         const embed = new EmbedBuilder()
           .setColor(0xff99cc)
-          .setTitle("✏️ 编辑数据")
+          .setTitle("âœï¸ ç¼–è¾‘æ•°æ®")
           .setDescription(orderList)
           .addFields(
             {
-              name: "📝 如何编辑",
-              value: "• 使用 `node db-edit.js` 进行详细编辑\n• 或在 Discord 中要求管理员协助编辑\n• 支持修改: 玩家名、金额、订单类型等",
+              name: "ðŸ“ å¦‚ä½•ç¼–è¾‘",
+              value: "â€¢ ä½¿ç”¨ `node db-edit.js` è¿›è¡Œè¯¦ç»†ç¼–è¾‘\nâ€¢ æˆ–åœ¨ Discord ä¸­è¦æ±‚ç®¡ç†å‘˜ååŠ©ç¼–è¾‘\nâ€¢ æ”¯æŒä¿®æ”¹: çŽ©å®¶åã€é‡‘é¢ã€è®¢å•ç±»åž‹ç­‰",
             }
           )
-          .setFooter({ text: "需要修改? 请告知相关人员" });
+          .setFooter({ text: "éœ€è¦ä¿®æ”¹? è¯·å‘ŠçŸ¥ç›¸å…³äººå‘˜" });
 
         await interaction.editReply({ embeds: [embed] });
-        console.log("[db_edit] 完成");
+        console.log("[db_edit] å®Œæˆ");
       } catch (err) {
-        console.error("db_edit 错误:", err);
+        console.error("db_edit é”™è¯¯:", err);
         try {
           await interaction.editReply({
-            content: `❌ 获取编辑信息失败: ${err.message}`,
+            content: `âŒ èŽ·å–ç¼–è¾‘ä¿¡æ¯å¤±è´¥: ${err.message}`,
           });
         } catch (e) {
-          console.error("db_edit 回复失败:", e);
+          console.error("db_edit å›žå¤å¤±è´¥:", e);
         }
       }
     }
 
     // ---------------------------------------------------------
-    // /db 按钮处理器 - db_manager
+    // /db æŒ‰é’®å¤„ç†å™¨ - db_manager
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "db_manager") {
       try {
-        console.log("[db_manager] 开始处理...");
+        console.log("[db_manager] å¼€å§‹å¤„ç†...");
         await interaction.deferReply({ ephemeral: true });
 
         const allOrders = await db.getAllOrders();
         const stats = await db.getStats();
-        console.log("[db_manager] 数据获取成功");
+        console.log("[db_manager] æ•°æ®èŽ·å–æˆåŠŸ");
 
         const embed = new EmbedBuilder()
           .setColor(0xff99cc)
-          .setTitle("⚙️ 数据库管理")
-          .setDescription("选择管理选项:")
+          .setTitle("âš™ï¸ æ•°æ®åº“ç®¡ç†")
+          .setDescription("é€‰æ‹©ç®¡ç†é€‰é¡¹:")
           .addFields(
             {
-              name: "📊 现有订单",
-              value: `\`\`\`\n${allOrders.length} 条订单记录\n${stats.totalOrders || 0} 个有效订单\n\`\`\``,
+              name: "ðŸ“Š çŽ°æœ‰è®¢å•",
+              value: `\`\`\`\n${allOrders.length} æ¡è®¢å•è®°å½•\n${stats.totalOrders || 0} ä¸ªæœ‰æ•ˆè®¢å•\n\`\`\``,
             },
             {
-              name: "🔧 可用操作",
-              value: "• 使用 `node db-manager.js` 进行完整管理\n• 支持: 查看、搜索、删除、导出\n• 建议: 定期备份数据库",
+              name: "ðŸ”§ å¯ç”¨æ“ä½œ",
+              value: "â€¢ ä½¿ç”¨ `node db-manager.js` è¿›è¡Œå®Œæ•´ç®¡ç†\nâ€¢ æ”¯æŒ: æŸ¥çœ‹ã€æœç´¢ã€åˆ é™¤ã€å¯¼å‡º\nâ€¢ å»ºè®®: å®šæœŸå¤‡ä»½æ•°æ®åº“",
             }
           )
-          .setFooter({ text: "更多操作请使用命令行工具" });
+          .setFooter({ text: "æ›´å¤šæ“ä½œè¯·ä½¿ç”¨å‘½ä»¤è¡Œå·¥å…·" });
 
         await interaction.editReply({ embeds: [embed] });
-        console.log("[db_manager] 完成");
+        console.log("[db_manager] å®Œæˆ");
       } catch (err) {
-        console.error("db_manager 错误:", err);
+        console.error("db_manager é”™è¯¯:", err);
         try {
           await interaction.editReply({
-            content: `❌ 获取管理信息失败: ${err.message}`,
+            content: `âŒ èŽ·å–ç®¡ç†ä¿¡æ¯å¤±è´¥: ${err.message}`,
           });
         } catch (e) {
-          console.error("db_manager 回复失败:", e);
+          console.error("db_manager å›žå¤å¤±è´¥:", e);
         }
       }
     }
 
     // ---------------------------------------------------------
-    // /db 按钮处理器 - db_export_excel (现在导出CSV从SQLite)
+    // /db æŒ‰é’®å¤„ç†å™¨ - db_export_excel (çŽ°åœ¨å¯¼å‡ºCSVä»ŽSQLite)
     // ---------------------------------------------------------
-    // /db 按钮处理器 - db_export_excel - 已改为 export_excel
+    // /db æŒ‰é’®å¤„ç†å™¨ - db_export_excel - å·²æ”¹ä¸º export_excel
     // ---------------------------------------------------------
-    // 【已弃用】此处理器已移除，导出改为使用 export_excel
+    // ã€å·²å¼ƒç”¨ã€‘æ­¤å¤„ç†å™¨å·²ç§»é™¤ï¼Œå¯¼å‡ºæ”¹ä¸ºä½¿ç”¨ export_excel
 
     // ---------------------------------------------------------
-    // /db 按钮处理器 - db_export_json
+    // /db æŒ‰é’®å¤„ç†å™¨ - db_export_json
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "db_export_json") {
       try {
-        console.log("[db_export_json] 开始处理...");
+        console.log("[db_export_json] å¼€å§‹å¤„ç†...");
         await interaction.deferReply({ ephemeral: true });
 
         const allOrders = await db.getAllOrders();
-        console.log("[db_export_json] 获取订单数:", allOrders.length);
+        console.log("[db_export_json] èŽ·å–è®¢å•æ•°:", allOrders.length);
 
         if (allOrders.length === 0) {
           await interaction.editReply({
-            content: "📊 暂无数据可导出～",
+            content: "ðŸ“Š æš‚æ— æ•°æ®å¯å¯¼å‡ºï½ž",
           });
           return;
         }
 
-        // 【改进】使用 exporter 模块处理导出
+        // ã€æ”¹è¿›ã€‘ä½¿ç”¨ exporter æ¨¡å—å¤„ç†å¯¼å‡º
         const filePath = exporter.exportToJSON(allOrders);
         const attachment = new AttachmentBuilder(filePath);
         await interaction.editReply({
-          content: `✅ 已导出 ${allOrders.length} 条订单记录`,
+          content: `âœ… å·²å¯¼å‡º ${allOrders.length} æ¡è®¢å•è®°å½•`,
           files: [attachment],
         });
-        console.log("[db_export_json] 完成");
+        console.log("[db_export_json] å®Œæˆ");
 
-        // 自动删除临时文件
+        // è‡ªåŠ¨åˆ é™¤ä¸´æ—¶æ–‡ä»¶
         exporter.deleteFileAsync(filePath, 2000);
       } catch (err) {
-        console.error("db_export_json 错误:", err);
+        console.error("db_export_json é”™è¯¯:", err);
         try {
           await interaction.editReply({
-            content: `❌ 导出 JSON 失败: ${err.message}`,
+            content: `âŒ å¯¼å‡º JSON å¤±è´¥: ${err.message}`,
           });
         } catch (e) {
-          console.error("db_export_json 回复失败:", e);
+          console.error("db_export_json å›žå¤å¤±è´¥:", e);
         }
       }
     }
 
     // ---------------------------------------------------------
-    // /db 按钮处理器 - db_refresh
+    // /db æŒ‰é’®å¤„ç†å™¨ - db_refresh
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "db_refresh") {
       try {
-        console.log("[db_refresh] 开始处理...");
+        console.log("[db_refresh] å¼€å§‹å¤„ç†...");
         
-        // 重新获取数据库统计信息
+        // é‡æ–°èŽ·å–æ•°æ®åº“ç»Ÿè®¡ä¿¡æ¯
         const stats = await db.getStats();
         const allOrders = await db.getAllOrders();
-        console.log("[db_refresh] 数据获取成功");
+        console.log("[db_refresh] æ•°æ®èŽ·å–æˆåŠŸ");
 
         const newEmbed = new EmbedBuilder()
           .setColor(0xff99cc)
-          .setTitle("📊 数据库管理中心")
-          .setDescription("选择下方功能按钮进行相应操作～")
+          .setTitle("ðŸ“Š æ•°æ®åº“ç®¡ç†ä¸­å¿ƒ")
+          .setDescription("é€‰æ‹©ä¸‹æ–¹åŠŸèƒ½æŒ‰é’®è¿›è¡Œç›¸åº”æ“ä½œï½ž")
           .setFields(
             {
-              name: "📈 数据库统计",
-              value: `\`\`\`\n总订单数: ${stats.totalOrders || 0}\n总收入: RM ${(stats.totalRevenue || 0).toFixed(2)}\n记录总数: ${allOrders.length}\n最后更新: ${stats.lastUpdated || "未知"}\n\`\`\``,
+              name: "ðŸ“ˆ æ•°æ®åº“ç»Ÿè®¡",
+              value: `\`\`\`\næ€»è®¢å•æ•°: ${stats.totalOrders || 0}\næ€»æ”¶å…¥: RM ${(stats.totalRevenue || 0).toFixed(2)}\nè®°å½•æ€»æ•°: ${allOrders.length}\næœ€åŽæ›´æ–°: ${stats.lastUpdated || "æœªçŸ¥"}\n\`\`\``,
               inline: false,
             }
           )
-          .setFooter({ text: "✅ 已刷新数据 | 💡 提示: 点击下方按钮选择功能" });
+          .setFooter({ text: "âœ… å·²åˆ·æ–°æ•°æ® | ðŸ’¡ æç¤º: ç‚¹å‡»ä¸‹æ–¹æŒ‰é’®é€‰æ‹©åŠŸèƒ½" });
 
         const row1 = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId("db_info")
-            .setLabel("📊 数据库信息")
+            .setLabel("ðŸ“Š æ•°æ®åº“ä¿¡æ¯")
             .setStyle(ButtonStyle.Primary)
-            .setEmoji("📊"),
+            .setEmoji("ðŸ“Š"),
 
           new ButtonBuilder()
             .setCustomId("db_edit")
-            .setLabel("✏️ 编辑数据")
+            .setLabel("âœï¸ ç¼–è¾‘æ•°æ®")
             .setStyle(ButtonStyle.Primary)
-            .setEmoji("✏️"),
+            .setEmoji("âœï¸"),
 
           new ButtonBuilder()
             .setCustomId("db_manager")
-            .setLabel("⚙️ 数据管理")
+            .setLabel("âš™ï¸ æ•°æ®ç®¡ç†")
             .setStyle(ButtonStyle.Primary)
-            .setEmoji("⚙️")
+            .setEmoji("âš™ï¸")
         );
 
         const row2 = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId("export_excel")
-            .setLabel("📥 导出 Excel")
+            .setLabel("ðŸ“¥ å¯¼å‡º Excel")
             .setStyle(ButtonStyle.Success)
-            .setEmoji("📥"),
+            .setEmoji("ðŸ“¥"),
 
           new ButtonBuilder()
             .setCustomId("db_export_json")
-            .setLabel("💾 导出 JSON")
+            .setLabel("ðŸ’¾ å¯¼å‡º JSON")
             .setStyle(ButtonStyle.Success)
-            .setEmoji("💾"),
+            .setEmoji("ðŸ’¾"),
 
           new ButtonBuilder()
             .setCustomId("db_refresh")
-            .setLabel("🔄 刷新数据")
+            .setLabel("ðŸ”„ åˆ·æ–°æ•°æ®")
             .setStyle(ButtonStyle.Secondary)
-            .setEmoji("🔄")
+            .setEmoji("ðŸ”„")
         );
 
         await interaction.update({
           embeds: [newEmbed],
           components: [row1, row2],
         });
-        console.log("[db_refresh] 完成");
+        console.log("[db_refresh] å®Œæˆ");
       } catch (err) {
-        console.error("db_refresh 错误:", err);
+        console.error("db_refresh é”™è¯¯:", err);
         try {
           await interaction.reply({
-            content: `❌ 刷新失败: ${err.message}`,
+            content: `âŒ åˆ·æ–°å¤±è´¥: ${err.message}`,
             ephemeral: true,
           });
         } catch (e) {
-          console.error("db_refresh 回复失败:", e);
+          console.error("db_refresh å›žå¤å¤±è´¥:", e);
         }
       }
     }
 
     // ---------------------------------------------------------
-    // /statssetup（发送统计按钮面板）
+    // /statssetupï¼ˆå‘é€ç»Ÿè®¡æŒ‰é’®é¢æ¿ï¼‰
     // ---------------------------------------------------------
     if (
       interaction.isChatInputCommand() &&
@@ -3373,18 +3377,18 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     ) {
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("📊 派單統計中心")
-        .setDescription(`${sep()}\n点击下方按钮可查看或重置派单统计～\n${sep()}`);
+        .setTitle("ðŸ“Š æ´¾å–®çµ±è¨ˆä¸­å¿ƒ")
+        .setDescription(`${sep()}\nç‚¹å‡»ä¸‹æ–¹æŒ‰é’®å¯æŸ¥çœ‹æˆ–é‡ç½®æ´¾å•ç»Ÿè®¡ï½ž\n${sep()}`);
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("view_stats")
-          .setLabel("📈 查看统计")
+          .setLabel("ðŸ“ˆ æŸ¥çœ‹ç»Ÿè®¡")
           .setStyle(ButtonStyle.Primary),
 
         new ButtonBuilder()
           .setCustomId("reset_stats")
-          .setLabel("🔁 重置统计")
+          .setLabel("ðŸ” é‡ç½®ç»Ÿè®¡")
           .setStyle(ButtonStyle.Danger)
       );
 
@@ -3397,7 +3401,7 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // =============================================================
-    // 统计系统（查看 / 重置 / 自动更新）
+    // ç»Ÿè®¡ç³»ç»Ÿï¼ˆæŸ¥çœ‹ / é‡ç½® / è‡ªåŠ¨æ›´æ–°ï¼‰
     // =============================================================
     async function readStats() {
       return await db.getStats();
@@ -3416,31 +3420,31 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
       const channel = guild.channels.cache.get(LOG_CHANNEL_ID);
       if (!channel) return;
 
-      //查找是否已有自动统计 embed
+      //æŸ¥æ‰¾æ˜¯å¦å·²æœ‰è‡ªåŠ¨ç»Ÿè®¡ embed
       const messages = await channel.messages.fetch({ limit: 20 }).catch(() => null);
       const existing = messages?.find(
         (m) =>
           m.author.id === client.user.id &&
-          m.embeds?.[0]?.title === "📊 新派单统计（自动更新）"
+          m.embeds?.[0]?.title === "ðŸ“Š æ–°æ´¾å•ç»Ÿè®¡ï¼ˆè‡ªåŠ¨æ›´æ–°ï¼‰"
       );
 
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("📊 新派单统计（自动更新）")
-        .setDescription(`${sep()}\n以下为温柔统计总览～\n${sep()}`)
+        .setTitle("ðŸ“Š æ–°æ´¾å•ç»Ÿè®¡ï¼ˆè‡ªåŠ¨æ›´æ–°ï¼‰")
+        .setDescription(`${sep()}\nä»¥ä¸‹ä¸ºæ¸©æŸ”ç»Ÿè®¡æ€»è§ˆï½ž\n${sep()}`)
         .addFields(
-          { name: "派单总数", value: `${stats.totalOrders}`, inline: true },
+          { name: "æ´¾å•æ€»æ•°", value: `${stats.totalOrders}`, inline: true },
           {
-            name: "订单总金额",
+            name: "è®¢å•æ€»é‡‘é¢",
             value: `RM ${Number(stats.totalRevenue || 0).toFixed(2)}`,
             inline: true,
           },
           {
-            name: "最后更新时间",
+            name: "æœ€åŽæ›´æ–°æ—¶é—´",
             value: `${
               stats.lastUpdated
                 ? new Date(stats.lastUpdated).toLocaleString()
-                : "无"
+                : "æ— "
             }`,
             inline: false,
           }
@@ -3454,62 +3458,62 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
       }
     }
 
-    // 查看统计（按钮）
+    // æŸ¥çœ‹ç»Ÿè®¡ï¼ˆæŒ‰é’®ï¼‰
     if (interaction.isButton() && interaction.customId === "view_stats") {
       const stats = await readStats();
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("📈 新派单统计（即时）")
-        .setDescription(`${sep()}\n这是当前的统计数据，感谢你一直的支持～\n${sep()}`)
+        .setTitle("ðŸ“ˆ æ–°æ´¾å•ç»Ÿè®¡ï¼ˆå³æ—¶ï¼‰")
+        .setDescription(`${sep()}\nè¿™æ˜¯å½“å‰çš„ç»Ÿè®¡æ•°æ®ï¼Œæ„Ÿè°¢ä½ ä¸€ç›´çš„æ”¯æŒï½ž\n${sep()}`)
         .addFields(
-          { name: "派单总数", value: `${stats.totalOrders}`, inline: true },
+          { name: "æ´¾å•æ€»æ•°", value: `${stats.totalOrders}`, inline: true },
           {
-            name: "订单总金额",
+            name: "è®¢å•æ€»é‡‘é¢",
             value: `RM ${Number(stats.totalRevenue || 0).toFixed(2)}`,
             inline: true,
           },
           {
-            name: "最后更新时间",
+            name: "æœ€åŽæ›´æ–°æ—¶é—´",
             value: `${
               stats.lastUpdated
                 ? new Date(stats.lastUpdated).toLocaleString()
-                : "无"
+                : "æ— "
             }`,
             inline: false,
           }
         )
         .setTimestamp();
 
-      // 📱 自动发送报表到 Telegram（仅第一个群）
-      const telegramStatsMsg = `<b>📊 派单统计报表</b>
-━━━━━━━━━━━━━━━━━━
-<b>📈 派单总数:</b> ${stats.totalOrders}
-<b>💰 订单总金额:</b> RM ${Number(stats.totalRevenue || 0).toFixed(2)}
-<b>⏰ 最后更新时间:</b> ${
+      // ðŸ“± è‡ªåŠ¨å‘é€æŠ¥è¡¨åˆ° Telegramï¼ˆä»…ç¬¬ä¸€ä¸ªç¾¤ï¼‰
+      const telegramStatsMsg = `<b>ðŸ“Š æ´¾å•ç»Ÿè®¡æŠ¥è¡¨</b>
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+<b>ðŸ“ˆ æ´¾å•æ€»æ•°:</b> ${stats.totalOrders}
+<b>ðŸ’° è®¢å•æ€»é‡‘é¢:</b> RM ${Number(stats.totalRevenue || 0).toFixed(2)}
+<b>â° æœ€åŽæ›´æ–°æ—¶é—´:</b> ${
         stats.lastUpdated
           ? new Date(stats.lastUpdated).toLocaleString("zh-CN")
-          : "无"
+          : "æ— "
       }
-━━━━━━━━━━━━━━━━━━
-🔔 报表已在 Discord 查看`;
-      // 异步发送Telegram，不阻塞Discord响应
+â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”â”
+ðŸ”” æŠ¥è¡¨å·²åœ¨ Discord æŸ¥çœ‹`;
+      // å¼‚æ­¥å‘é€Telegramï¼Œä¸é˜»å¡žDiscordå“åº”
       sendTelegramReport(config.telegramChatId, telegramStatsMsg, config.telegramMessageThreadId).catch(() => {});
 
       await updateStatsSummaryEmbed(interaction.guild).catch(() => {});
       await interaction.reply({ embeds: [embed], flags: 64 }).catch(() => {
-        console.log("view_stats reply失败，但数据已处理");
+        console.log("view_stats replyå¤±è´¥ï¼Œä½†æ•°æ®å·²å¤„ç†");
       });
       return;
     }
 
-    // 重置统计（管理员）
+    // é‡ç½®ç»Ÿè®¡ï¼ˆç®¡ç†å‘˜ï¼‰
     if (interaction.isButton() && interaction.customId === "reset_stats") {
       const member =
         interaction.guild.members.cache.get(interaction.user.id) ||
         (await interaction.guild.members.fetch(interaction.user.id).catch(() => null));
 
       if (!member) {
-        await interaction.reply({ content: "❌ 无法验证你的权限。请稍后重试或联系管理员～", ephemeral: true });
+        await interaction.reply({ content: "âŒ æ— æ³•éªŒè¯ä½ çš„æƒé™ã€‚è¯·ç¨åŽé‡è¯•æˆ–è”ç³»ç®¡ç†å‘˜ï½ž", ephemeral: true });
         return;
       }
 
@@ -3518,7 +3522,7 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
         member.roles.cache.has(config.adminRoleId);
 
       if (!isAdmin) {
-        await interaction.reply({ content: "❌ 仅管理员可以重置统计。若你认为这是误判请联系管理员～", ephemeral: true });
+        await interaction.reply({ content: "âŒ ä»…ç®¡ç†å‘˜å¯ä»¥é‡ç½®ç»Ÿè®¡ã€‚è‹¥ä½ è®¤ä¸ºè¿™æ˜¯è¯¯åˆ¤è¯·è”ç³»ç®¡ç†å‘˜ï½ž", ephemeral: true });
         return;
       }
 
@@ -3526,16 +3530,16 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
       await updateStatsSummaryEmbed(interaction.guild).catch(() => {});
 
       await interaction.reply({
-        content: "🔁 统计已重置！totalOrders 与 totalRevenue 已设为 0，温柔地开始新的统计～",
+        content: "ðŸ” ç»Ÿè®¡å·²é‡ç½®ï¼totalOrders ä¸Ž totalRevenue å·²è®¾ä¸º 0ï¼Œæ¸©æŸ”åœ°å¼€å§‹æ–°çš„ç»Ÿè®¡ï½ž",
         ephemeral: true,
       });
 
       return;
     }
 
-    // ====================== 陪玩/派单/统计 系统结束 ======================
+    // ====================== é™ªçŽ©/æ´¾å•/ç»Ÿè®¡ ç³»ç»Ÿç»“æŸ ======================
     // ---------------------------------------------------------
-    // /supportsetup（建立客服按钮）
+    // /supportsetupï¼ˆå»ºç«‹å®¢æœæŒ‰é’®ï¼‰
     // ---------------------------------------------------------
     if (
       interaction.isChatInputCommand() &&
@@ -3543,14 +3547,14 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     ) {
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("💬 客服中心")
+        .setTitle("ðŸ’¬ å®¢æœä¸­å¿ƒ")
         .setThumbnail("https://cdn.discordapp.com/attachments/1433987480524165213/1440965790764503060/Generated_Image_November_20_2025_-_1_44PM.png?ex=69201378&is=691ec1f8&hm=b557cca8284e29b7c5610a868db7d6ae31610c0c4fd8d8e717bad59cbc0c839b&")
-        .setDescription(`${sep()}\n需要帮助？点击下方按钮联系工作人员。\n${sep()}`);
+        .setDescription(`${sep()}\néœ€è¦å¸®åŠ©ï¼Ÿç‚¹å‡»ä¸‹æ–¹æŒ‰é’®è”ç³»å·¥ä½œäººå‘˜ã€‚\n${sep()}`);
 
       const row = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("open_support")
-          .setLabel("💬 联系客服")
+          .setLabel("ðŸ’¬ è”ç³»å®¢æœ")
           .setStyle(ButtonStyle.Secondary)
       );
 
@@ -3559,27 +3563,27 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // ---------------------------------------------------------
-    // 打开客服表单 Modal
+    // æ‰“å¼€å®¢æœè¡¨å• Modal
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "open_support") {
       const modal = new ModalBuilder()
         .setCustomId("supportForm")
-        .setTitle("💬 客服表单");
+        .setTitle("ðŸ’¬ å®¢æœè¡¨å•");
 
       modal.addComponents(
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("type")
-            .setLabel("🧩 问题类型")
-            .setPlaceholder("例如：订单问题 / 技术问题 / 投诉")
+            .setLabel("ðŸ§© é—®é¢˜ç±»åž‹")
+            .setPlaceholder("ä¾‹å¦‚ï¼šè®¢å•é—®é¢˜ / æŠ€æœ¯é—®é¢˜ / æŠ•è¯‰")
             .setStyle(TextInputStyle.Short)
             .setRequired(true)
         ),
         new ActionRowBuilder().addComponents(
           new TextInputBuilder()
             .setCustomId("description")
-            .setLabel("📝 问题描述")
-            .setPlaceholder("请尽量详细描述你的问题")
+            .setLabel("ðŸ“ é—®é¢˜æè¿°")
+            .setPlaceholder("è¯·å°½é‡è¯¦ç»†æè¿°ä½ çš„é—®é¢˜")
             .setStyle(TextInputStyle.Paragraph)
             .setRequired(true)
         )
@@ -3590,7 +3594,7 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // ---------------------------------------------------------
-    // 提交客服表单 → 创建客服频道
+    // æäº¤å®¢æœè¡¨å• â†’ åˆ›å»ºå®¢æœé¢‘é“
     // ---------------------------------------------------------
     if (interaction.isModalSubmit() && interaction.customId === "supportForm") {
       const guild = interaction.guild;
@@ -3601,17 +3605,17 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
 
       const channelName = `support-${sanitizeName(user.username)}`;
 
-      // 避免重复开客服
+      // é¿å…é‡å¤å¼€å®¢æœ
       const existing = guild.channels.cache.find((c) => c.name === channelName);
       if (existing) {
         await interaction.reply({
-          content: "❗ 你已有一个客服频道。请在原频道继续沟通～",
+          content: "â— ä½ å·²æœ‰ä¸€ä¸ªå®¢æœé¢‘é“ã€‚è¯·åœ¨åŽŸé¢‘é“ç»§ç»­æ²Ÿé€šï½ž",
           ephemeral: true,
         });
         return;
       }
 
-      // 写入 support_logs.json
+      // å†™å…¥ support_logs.json
       try {
         const logs = readJSON(SUPPORT_PATH) || [];
         logs.push({
@@ -3623,10 +3627,10 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
         });
         writeJSON(SUPPORT_PATH, logs);
       } catch (err) {
-        console.error("写入支持记录失败:", err);
+        console.error("å†™å…¥æ”¯æŒè®°å½•å¤±è´¥:", err);
       }
 
-      // 创建客服频道
+      // åˆ›å»ºå®¢æœé¢‘é“
       const supportChannel = await guild.channels.create({
         name: channelName,
         type: ChannelType.GuildText,
@@ -3659,30 +3663,30 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
 
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
-        .setTitle("💬 客服问题详情")
-        .setDescription(`${sep()}\n我们已收到你的问题，工作人员会很快联系你～\n${sep()}`)
+        .setTitle("ðŸ’¬ å®¢æœé—®é¢˜è¯¦æƒ…")
+        .setDescription(`${sep()}\næˆ‘ä»¬å·²æ”¶åˆ°ä½ çš„é—®é¢˜ï¼Œå·¥ä½œäººå‘˜ä¼šå¾ˆå¿«è”ç³»ä½ ï½ž\n${sep()}`)
         .addFields(
-          { name: "🧩 类型", value: type, inline: true },
-          { name: "📝 描述", value: desc, inline: false }
+          { name: "ðŸ§© ç±»åž‹", value: type, inline: true },
+          { name: "ðŸ“ æè¿°", value: desc, inline: false }
         )
-        .setFooter({ text: `来自用户：${user.tag}` })
+        .setFooter({ text: `æ¥è‡ªç”¨æˆ·ï¼š${user.tag}` })
         .setTimestamp();
 
       const closeBtn = new ActionRowBuilder().addComponents(
         new ButtonBuilder()
           .setCustomId("close_support")
-          .setLabel("📞 关闭客服")
+          .setLabel("ðŸ“ž å…³é—­å®¢æœ")
           .setStyle(ButtonStyle.Danger)
       );
 
       await supportChannel.send({
-        content: `💬 ${user} 的客服频道已建立，工作人员会尽快处理～`,
+        content: `ðŸ’¬ ${user} çš„å®¢æœé¢‘é“å·²å»ºç«‹ï¼Œå·¥ä½œäººå‘˜ä¼šå°½å¿«å¤„ç†ï½ž`,
         embeds: [embed],
         components: [closeBtn],
       });
 
       await interaction.reply({
-        content: `✅ 客服频道已创建：${supportChannel}`,
+        content: `âœ… å®¢æœé¢‘é“å·²åˆ›å»ºï¼š${supportChannel}`,
         ephemeral: true,
       });
 
@@ -3690,13 +3694,13 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     }
 
     // ---------------------------------------------------------
-    // 关闭客服频道
+    // å…³é—­å®¢æœé¢‘é“
     // ---------------------------------------------------------
     if (interaction.isButton() && interaction.customId === "close_support") {
       const channel = interaction.channel;
 
       await interaction.reply({
-        content: "📞 此客服频道将在 5 秒后关闭。感谢你的配合～",
+        content: "ðŸ“ž æ­¤å®¢æœé¢‘é“å°†åœ¨ 5 ç§’åŽå…³é—­ã€‚æ„Ÿè°¢ä½ çš„é…åˆï½ž",
         ephemeral: true,
       });
 
@@ -3711,7 +3715,7 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
     try {
       if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({
-          content: "❌ 处理请求时发生错误，请联系管理员。",
+          content: "âŒ å¤„ç†è¯·æ±‚æ—¶å‘ç”Ÿé”™è¯¯ï¼Œè¯·è”ç³»ç®¡ç†å‘˜ã€‚",
           ephemeral: true,
         });
       }
@@ -3720,48 +3724,48 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
 });
 
 // =============================================================
-// 欢迎系统（粉色可爱风）
+// æ¬¢è¿Žç³»ç»Ÿï¼ˆç²‰è‰²å¯çˆ±é£Žï¼‰
 // ---------------- Welcome & keyword replies ----------------
 client.on("guildMemberAdd", async (member) => {
   try {
     const channel = member.guild.channels.cache.get(config.welcomeChannelId);
     if (!channel) return;
 
-    // Banner 图片（上传到 Discord 后复制图片链接）
-    const bannerUrl = "https://cdn.discordapp.com/attachments/1433987480524165213/1436675976376483840/2567ced4-39ff-4b37-b055-31839c369199_1.png?ex=69107844&is=690f26c4&hm=8b29dfdfb09bf715c2bdbf3b895a070b7fdf356a6476b52cbe40b157251aa90b&"; // ← 替换为你的Banner图
+    // Banner å›¾ç‰‡ï¼ˆä¸Šä¼ åˆ° Discord åŽå¤åˆ¶å›¾ç‰‡é“¾æŽ¥ï¼‰
+    const bannerUrl = "https://cdn.discordapp.com/attachments/1433987480524165213/1436675976376483840/2567ced4-39ff-4b37-b055-31839c369199_1.png?ex=69107844&is=690f26c4&hm=8b29dfdfb09bf715c2bdbf3b895a070b7fdf356a6476b52cbe40b157251aa90b&"; // â† æ›¿æ¢ä¸ºä½ çš„Bannerå›¾
 
-    // 1️⃣ 发送像素风「欢迎贵客光临」Banner
+    // 1ï¸âƒ£ å‘é€åƒç´ é£Žã€Œæ¬¢è¿Žè´µå®¢å…‰ä¸´ã€Banner
     const bannerEmbed = new EmbedBuilder()
       .setColor(0xffc800)
-      .setTitle("👑 欢迎贵客光临 👑")
+      .setTitle("ðŸ‘‘ æ¬¢è¿Žè´µå®¢å…‰ä¸´ ðŸ‘‘")
       .setImage(bannerUrl)
-      .setFooter({ text: "后宫佳丽 · 陪玩俱乐部" });
+      .setFooter({ text: "åŽå®«ä½³ä¸½ Â· é™ªçŽ©ä¿±ä¹éƒ¨" });
 
-    // 2️⃣ 原本的欢迎信息
+    // 2ï¸âƒ£ åŽŸæœ¬çš„æ¬¢è¿Žä¿¡æ¯
     const infoEmbed = new EmbedBuilder()
       .setColor(0xff8cff)
-      .setTitle(`🌸 欢迎加入，${member.user.username}！💫`)
+      .setTitle(`ðŸŒ¸ æ¬¢è¿ŽåŠ å…¥ï¼Œ${member.user.username}ï¼ðŸ’«`)
       .setDescription(
-        `嗨嗨 ${member} 💕
-欢迎来到 **${member.guild.name}** ～！
+        `å—¨å—¨ ${member} ðŸ’•
+æ¬¢è¿Žæ¥åˆ° **${member.guild.name}** ï½žï¼
 
-✨ 在这里你可以：
-📜 信息区：<#1433927932765540473>
-🎮 点单区：<#1433718201690357802>
-💬 客服传送门：<#1434458460824801282>
-✨ 放轻松，这里不只是群～
-💞 这里是一个能让你笑出来的小世界 💫
+âœ¨ åœ¨è¿™é‡Œä½ å¯ä»¥ï¼š
+ðŸ“œ ä¿¡æ¯åŒºï¼š<#1433927932765540473>
+ðŸŽ® ç‚¹å•åŒºï¼š<#1433718201690357802>
+ðŸ’¬ å®¢æœä¼ é€é—¨ï¼š<#1434458460824801282>
+âœ¨ æ”¾è½»æ¾ï¼Œè¿™é‡Œä¸åªæ˜¯ç¾¤ï½ž
+ðŸ’ž è¿™é‡Œæ˜¯ä¸€ä¸ªèƒ½è®©ä½ ç¬‘å‡ºæ¥çš„å°ä¸–ç•Œ ðŸ’«
 
-> 👑 欢迎来到 · **你的后宫佳丽**
-> 愿你在这里收获陪伴与快乐 ❤️`
+> ðŸ‘‘ æ¬¢è¿Žæ¥åˆ° Â· **ä½ çš„åŽå®«ä½³ä¸½**
+> æ„¿ä½ åœ¨è¿™é‡Œæ”¶èŽ·é™ªä¼´ä¸Žå¿«ä¹ â¤ï¸`
       )
       .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-      .setFooter({ text: "陪玩后宫 ✨ 让游戏更有趣" })
+      .setFooter({ text: "é™ªçŽ©åŽå®« âœ¨ è®©æ¸¸æˆæ›´æœ‰è¶£" })
       .setTimestamp();
 
-    // 连续发送两条 Embed
+    // è¿žç»­å‘é€ä¸¤æ¡ Embed
     await channel.send({ embeds: [bannerEmbed] });
-    await channel.send({ content: `🎉 ${member} 欢迎来到 **${member.guild.name}**！💞`, embeds: [infoEmbed] });
+    await channel.send({ content: `ðŸŽ‰ ${member} æ¬¢è¿Žæ¥åˆ° **${member.guild.name}**ï¼ðŸ’ž`, embeds: [infoEmbed] });
 
   } catch (err) {
     console.error("welcome message error:", err);
@@ -3769,61 +3773,62 @@ client.on("guildMemberAdd", async (member) => {
 });
 
 // =============================================================
-// ❌ 本版本 v4.2c-Pink 已移除关键词自动回复（messageCreate）
+// âŒ æœ¬ç‰ˆæœ¬ v4.2c-Pink å·²ç§»é™¤å…³é”®è¯è‡ªåŠ¨å›žå¤ï¼ˆmessageCreateï¼‰
 // =============================================================
 
 // =============================================================
-// MESSAGE LISTENER - 监听特定频道的消息并转发到 Telegram
+// MESSAGE LISTENER - ç›‘å¬ç‰¹å®šé¢‘é“çš„æ¶ˆæ¯å¹¶è½¬å‘åˆ° Telegram
 // =============================================================
 client.on("messageCreate", async (message) => {
-  // 忽略机器人消息
+  // å¿½ç•¥æœºå™¨äººæ¶ˆæ¯
   if (message.author.bot) return;
   
-  // 只监听报备频道的消息
+  // åªç›‘å¬æŠ¥å¤‡é¢‘é“çš„æ¶ˆæ¯
   if (message.channel.id !== REPORT_CHANNEL_ID) return;
 
   try {
-    const orderNumber = `PO-${Date.now()}`; // 生成订单号
+    const orderNumber = `PO-${Date.now()}`; // ç”Ÿæˆè®¢å•å·
     
-    // 从消息内容中提取陪陪名字和金额（假设格式中包含这些信息）
-    // 可以根据你的实际消息格式进行调整
+    // ä»Žæ¶ˆæ¯å†…å®¹ä¸­æå–é™ªé™ªåå­—å’Œé‡‘é¢ï¼ˆå‡è®¾æ ¼å¼ä¸­åŒ…å«è¿™äº›ä¿¡æ¯ï¼‰
+    // å¯ä»¥æ ¹æ®ä½ çš„å®žé™…æ¶ˆæ¯æ ¼å¼è¿›è¡Œè°ƒæ•´
     const contentLines = message.content.split('\n');
-    let playerName = "未填写";
-    let amount = "未填写";
+    let playerName = "æœªå¡«å†™";
+    let amount = "æœªå¡«å†™";
     
-    // 简单的提取逻辑 - 可以根据实际需求修改
+    // ç®€å•çš„æå–é€»è¾‘ - å¯ä»¥æ ¹æ®å®žé™…éœ€æ±‚ä¿®æ”¹
     for (let i = 0; i < contentLines.length; i++) {
       const line = contentLines[i];
-      if (line.includes("陪陪") || line.includes("陪玩")) {
-        playerName = line.replace(/陪陪|陪玩|：|:/g, "").trim();
+      if (line.includes("é™ªé™ª") || line.includes("é™ªçŽ©")) {
+        playerName = line.replace(/é™ªé™ª|é™ªçŽ©|ï¼š|:/g, "").trim();
       }
-      if (line.includes("金额") || line.includes("价格") || line.includes("RM")) {
-        amount = line.replace(/金额|价格|：|:|RM/g, "").trim();
+      if (line.includes("é‡‘é¢") || line.includes("ä»·æ ¼") || line.includes("RM")) {
+        amount = line.replace(/é‡‘é¢|ä»·æ ¼|ï¼š|:|RM/g, "").trim();
       }
     }
 
-    const professionalTemplate = `📝 <b>报备单已收到</b>
+    const professionalTemplate = `ðŸ“ <b>æŠ¥å¤‡å•å·²æ”¶åˆ°</b>
 
-📌 <b>单号:</b> #${orderNumber}
-👤 <b>客户:</b> ${message.author.username}
-🧚‍♀️ <b>陪陪:</b> ${playerName}
-💰 <b>金额:</b> ${amount}
-💬 <b>内容:</b>
+ðŸ“Œ <b>å•å·:</b> #${orderNumber}
+ðŸ‘¤ <b>å®¢æˆ·:</b> ${message.author.username}
+ðŸ§šâ€â™€ï¸ <b>é™ªé™ª:</b> ${playerName}
+ðŸ’° <b>é‡‘é¢:</b> ${amount}
+ðŸ’¬ <b>å†…å®¹:</b>
 ${message.content}
 
-⏰ <b>时间:</b> ${new Date().toLocaleString("zh-CN")}`;
+â° <b>æ—¶é—´:</b> ${new Date().toLocaleString("zh-CN")}`;
 
-    // 发送到 Telegram
+    // å‘é€åˆ° Telegram
     await axios.post(`https://api.telegram.org/bot${config.telegramToken}/sendMessage`, {
       chat_id: config.telegramChatId,
       text: professionalTemplate,
       parse_mode: "HTML"
     });
 
-    console.log("✅ 报备已发送到 Telegram");
+    console.log("âœ… æŠ¥å¤‡å·²å‘é€åˆ° Telegram");
   } catch (err) {
-    console.error("❌ Telegram 发送错误:", err.response?.data || err.message);
+    console.error("âŒ Telegram å‘é€é”™è¯¯:", err.response?.data || err.message);
   }
 });
 
 client.login(config.token);
+
