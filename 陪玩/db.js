@@ -100,9 +100,49 @@ class DatabaseManager {
       }
       
       this.save();
+      
+      // 【新增】执行数据库迁移，为旧版本记录补充 orderId 信息
+      this.migrateOldRecords();
     } catch (err) {
       console.error('❌ 创建表失败:', err);
       throw err;
+    }
+  }
+
+  // 【新增】数据库迁移：为旧版本记录（Embed footer 中没有 orderId 的记录）补充信息
+  migrateOldRecords() {
+    try {
+      const orders = this.getAllOrders();
+      const oldRecordCount = orders.filter(o => !o.source || o.source === '').length;
+      
+      if (oldRecordCount > 0) {
+        console.warn(`⚠️ [迁移] 检测到 ${oldRecordCount} 条旧版本记录（缺少 source 信息）`);
+        
+        // 为缺少 source 的旧记录补充默认来源标记
+        const updateStmt = this.db.prepare('UPDATE orders SET source = ? WHERE source IS NULL OR source = ""');
+        updateStmt.bind(['migrated']);
+        updateStmt.step();
+        updateStmt.free();
+        
+        this.save();
+        console.log(`✅ [迁移] 已为 ${oldRecordCount} 条旧记录补充来源标记`);
+      }
+      
+      // 检查是否存在其他潜在问题
+      const recordsWithoutOrderNo = orders.filter(o => !o.orderNo || o.orderNo === '').length;
+      const recordsWithoutBoss = orders.filter(o => !o.boss || o.boss === '').length;
+      
+      if (recordsWithoutOrderNo > 0) {
+        console.warn(`⚠️ [迁移] 检测到 ${recordsWithoutOrderNo} 条记录未填写单号`);
+      }
+      if (recordsWithoutBoss > 0) {
+        console.warn(`⚠️ [迁移] 检测到 ${recordsWithoutBoss} 条记录缺少老板信息`);
+      }
+      
+      console.log('✅ [迁移] 数据库迁移完成');
+    } catch (err) {
+      console.error('❌ [迁移] 数据库迁移失败:', err.message);
+      // 不中断程序执行
     }
   }
 
@@ -138,8 +178,36 @@ class DatabaseManager {
       stmt.step();
       stmt.free();
       
+      // 【修复】获取最后插入的自增ID
+      let orderId = null;
+      try {
+        const idStmt = this.db.prepare('SELECT last_insert_rowid() as id');
+        if (idStmt.step()) {
+          const result = idStmt.getAsObject();
+          orderId = result.id;
+          console.log(`✅ 订单已插入，orderId: ${orderId}`);
+        }
+        idStmt.free();
+      } catch (e) {
+        console.error('⚠️ 获取自增ID失败:', e.message);
+        // 备选方案：查询最后一条记录
+        const fallbackStmt = this.db.prepare('SELECT id FROM orders ORDER BY id DESC LIMIT 1');
+        if (fallbackStmt.step()) {
+          const result = fallbackStmt.getAsObject();
+          orderId = result.id;
+          console.log(`✅ 使用备选方案获取orderId: ${orderId}`);
+        }
+        fallbackStmt.free();
+      }
+      
       this.save();
-      return { ...orderData };
+      
+      // 返回包含orderId的对象
+      return {
+        ...orderData,
+        id: orderId,
+        orderId: orderId
+      };
     } catch (err) {
       console.error('❌ 添加订单失败:', err);
       throw err;

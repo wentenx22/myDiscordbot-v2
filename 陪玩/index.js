@@ -70,6 +70,7 @@ const SUPPORT_CATEGORY_ID = "1433718201690357808";
 const SUPPORT_SECOND_ROLE_ID = "1434475964963749909";
 const LOG_CHANNEL_ID = "1433987480524165213"; // 统计频道
 const AUTO_REPORTBB_CHANNEL = "1436684853297938452";
+const REPORT_DISPATCH_CHANNEL_ID = "1436268020866617494"; // 报备派单频道
 const DB_PANEL_CHANNEL_ID = "1456648851384438978"; // /db 面板频道
 const CSV_ARCHIVE_CHANNEL_ID = "1457035667157680431"; // CSV 存档频道
 const SUPPORT_PATH = "./support_logs.json";
@@ -779,7 +780,7 @@ client.on("interactionCreate", async (interaction) => {
           });
         }
 
-        // 【修复】先保存到数据库，获取 orderId，然后将其写入 Embed footer
+        // 【修复】先保存到数据库，直接从返回值获取 orderId
         let orderId = null;
         try {
           const result = await db.addOrder({
@@ -792,11 +793,19 @@ client.on("interactionCreate", async (interaction) => {
             date: new Date().toLocaleString("zh-CN"),
             source: "reportForm",
           });
-          // sql.js 返回的是插入数据，需要获取最新插入的 ID
-          // 通过查询最后一条记录来获取 ID
-          const allOrders = await db.getAllOrders();
-          orderId = allOrders[0]?.id || null;
-          // 【架构改造】不再使用cacheManager，所有数据源都来自SQLite
+          
+          // 【修复】直接从返回的result中获取orderId
+          orderId = result.id || result.orderId || null;
+          
+          if (!orderId) {
+            console.error("❌ 数据库返回的orderId为空，返回值:", result);
+            return await interaction.reply({
+              content: "❌ 保存报备失败（无效的订单ID），请稍后重试",
+              ephemeral: true
+            });
+          }
+          
+          console.log(`✅ 报备成功保存，orderId: ${orderId}`);
         } catch (e) {
           console.error("❌ 保存报备到数据库失败：", e.message);
           return await interaction.reply({
@@ -821,7 +830,7 @@ client.on("interactionCreate", async (interaction) => {
           { name: "⌚ 报备时间", value: new Date().toLocaleString('zh-CN'), inline: true },
           { name: "🔢 单号状态", value: "⏳ 待添加", inline: true }
         )
-        .setFooter({ text: `陪玩后宫 • 管理员报备视图 💗 | ID:${orderId}` })
+        .setFooter({ text: `陪玩后宫 • 管理员报备视图 💗 | orderId:${orderId}` })
         .setTimestamp();
 
       // 公共频道看的 embed（隐藏老板名字）
@@ -840,7 +849,7 @@ client.on("interactionCreate", async (interaction) => {
           { name: "⌚ 报备时间", value: new Date().toLocaleString('zh-CN'), inline: true },
           { name: "🔢 单号状态", value: "⏳ 待添加", inline: true }
         )
-        .setFooter({ text: `陪玩后宫 • 谢谢你的一份用心 💗 | ID:${orderId}` })
+        .setFooter({ text: `陪玩后宫 • 谢谢你的一份用心 💗 | orderId:${orderId}` })
         .setTimestamp();
 
       // 📱 自动发送到 Telegram（仅第一个群，包含老板名字）
@@ -852,6 +861,7 @@ client.on("interactionCreate", async (interaction) => {
 <b>⏰ 时长:</b> ${duration}
 <b>💰 金额:</b> RM ${amount}
 <b>📅 时间:</b> ${new Date().toLocaleString("zh-CN")}
+<b>📦 订单ID:</b> ${orderId}
 ━━━━━━━━━━━━━━━━━━`;
       await sendTelegramReport(config.telegramChatId, telegramReportMsg, config.telegramMessageThreadId).catch(() => {});
 
@@ -868,6 +878,20 @@ client.on("interactionCreate", async (interaction) => {
         embeds: [embedForOthers],
         components: [row],
       });
+
+      // 【新增】自动发送到报备派单频道
+      try {
+        const reportDispatchChannel = interaction.guild.channels.cache.get(REPORT_DISPATCH_CHANNEL_ID) ||
+          (await interaction.guild.channels.fetch(REPORT_DISPATCH_CHANNEL_ID).catch(() => null));
+        if (reportDispatchChannel && reportDispatchChannel.isTextBased()) {
+          await reportDispatchChannel.send({ embeds: [embedForOthers], components: [row] });
+          console.log(`✅ 报备已发送到频道: ${REPORT_DISPATCH_CHANNEL_ID}`);
+        } else {
+          console.warn(`⚠️ 报备派单频道不存在或非文本频道: ${REPORT_DISPATCH_CHANNEL_ID}`);
+        }
+      } catch (err) {
+        console.error("❌ 发送报备到频道失败：", err.message);
+      }
 
       // ✅ 【禁用】管理员频道：发送包含老板名字的完整版本 - 单子报备不需要发去该频道
       // try {
@@ -909,6 +933,39 @@ client.on("interactionCreate", async (interaction) => {
       const gift = interaction.fields.getTextInputValue("gift");
       const value = parsePrice(interaction.fields.getTextInputValue("value") || 0);
 
+      // 保存到数据库，获取 orderId
+      let orderId = null;
+      try {
+        const result = await db.addOrder({
+          type: "gift",
+          boss: giver,
+          player: receiver,
+          orderType: gift,
+          duration: "",
+          amount: value,
+          date: new Date().toLocaleString("zh-CN"),
+          source: "giftReportForm",
+        });
+        
+        orderId = result.id || result.orderId || null;
+        
+        if (!orderId) {
+          console.error("❌ 数据库返回的orderId为空，返回值:", result);
+          return await interaction.reply({
+            content: "❌ 保存礼物报备失败（无效的订单ID），请稍后重试",
+            ephemeral: true
+          });
+        }
+        
+        console.log(`✅ 礼物报备成功保存，orderId: ${orderId}`);
+      } catch (e) {
+        console.error("❌ 保存礼物报备到数据库失败：", e.message);
+        return await interaction.reply({
+          content: "❌ 保存礼物报备失败，请稍后重试",
+          ephemeral: true
+        });
+      }
+
       // 管理员专用 embed（包含送礼人）
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
@@ -922,7 +979,7 @@ client.on("interactionCreate", async (interaction) => {
           { name: "💰 价值", value: `RM ${value}`, inline: true },
           { name: "🔢 单号", value: "未填写", inline: false }
         )
-        .setFooter({ text: "陪玩后宫 • 管理员专用礼物报备视图 💗" })
+        .setFooter({ text: `陪玩后宫 • 管理员专用礼物报备视图 💗 | orderId:${orderId}` })
         .setTimestamp();
 
       // 给普通用户看的embed（隐藏送礼人名字）
@@ -938,24 +995,8 @@ client.on("interactionCreate", async (interaction) => {
           { name: "💰 价值", value: `RM ${value}`, inline: true },
           { name: "🔢 单号", value: "未填写", inline: false }
         )
-        .setFooter({ text: "陪玩后宫 • 谢谢你的一份用心 💗" })
+        .setFooter({ text: `陪玩后宫 • 谢谢你的一份用心 💗 | orderId:${orderId}` })
         .setTimestamp();
-
-      // 保存到数据库
-      try {
-        await db.addOrder({
-          type: "gift",
-          boss: giver,
-          player: receiver,
-          orderType: gift,
-          duration: "",
-          amount: value,
-          date: new Date().toLocaleString("zh-CN"),
-          source: "giftReportForm",
-        });
-      } catch (e) {
-        console.error("保存礼物报备到数据库失败：", e);
-      }
 
       // 📱 自动发送到 Telegram（包含送礼人）
       const telegramGiftMsg = `<b>🎁 新的礼物报备</b>
@@ -965,6 +1006,7 @@ client.on("interactionCreate", async (interaction) => {
 <b>🎁 礼物:</b> ${gift}
 <b>💰 价值:</b> RM ${value}
 <b>📅 时间:</b> ${new Date().toLocaleString("zh-CN")}
+<b>📦 订单ID:</b> ${orderId}
 ━━━━━━━━━━━━━━━━━━`;
       await sendTelegramReport(config.telegramChatId, telegramGiftMsg, config.telegramMessageThreadId).catch(() => {});
 
@@ -1065,6 +1107,39 @@ client.on("interactionCreate", async (interaction) => {
       const duration = interaction.fields.getTextInputValue("duration");
       const amount = parsePrice(interaction.fields.getTextInputValue("amount"));
 
+      // 保存到数据库，获取 orderId
+      let orderId = null;
+      try {
+        const result = await db.addOrder({
+          type: "renew_report",
+          boss,
+          player,
+          orderType: "续单",
+          duration,
+          amount,
+          date: new Date().toLocaleString("zh-CN"),
+          source: "renewReportForm",
+        });
+        
+        orderId = result.id || result.orderId || null;
+        
+        if (!orderId) {
+          console.error("❌ 数据库返回的orderId为空，返回值:", result);
+          return await interaction.reply({
+            content: "❌ 保存续单报备失败（无效的订单ID），请稍后重试",
+            ephemeral: true
+          });
+        }
+        
+        console.log(`✅ 续单报备成功保存，orderId: ${orderId}`);
+      } catch (e) {
+        console.error("❌ 保存续单报备到数据库失败：", e.message);
+        return await interaction.reply({
+          content: "❌ 保存续单报备失败，请稍后重试",
+          ephemeral: true
+        });
+      }
+
       // 📌 续单报备成功 Embed（粉色治愈风）- 管理员看的完整版本
       const embed = new EmbedBuilder()
         .setColor(THEME_COLOR)
@@ -1080,7 +1155,7 @@ client.on("interactionCreate", async (interaction) => {
           { name: "⌚ 续单时间", value: new Date().toLocaleString('zh-CN'), inline: true },
           { name: "🔢 新单号状态", value: "⏳ 待添加", inline: true }
         )
-        .setFooter({ text: "陪玩后宫 • 续单报备视图 💗" })
+        .setFooter({ text: `陪玩后宫 • 续单报备视图 💗 | orderId:${orderId}` })
         .setTimestamp();
 
       // 公共频道看的 embed（隐藏老板名字）
@@ -1098,24 +1173,8 @@ client.on("interactionCreate", async (interaction) => {
           { name: "⌚ 续单时间", value: new Date().toLocaleString('zh-CN'), inline: true },
           { name: "🔢 新单号状态", value: "⏳ 待添加", inline: true }
         )
-        .setFooter({ text: "陪玩后宫 • 谢谢你的一份用心 💗" })
+        .setFooter({ text: `陪玩后宫 • 谢谢你的一份用心 💗 | orderId:${orderId}` })
         .setTimestamp();
-
-      // 保存到数据库
-      try {
-        await db.addOrder({
-          type: "renew_report",
-          boss,
-          player,
-          orderType: "续单",
-          duration,
-          amount,
-          date: new Date().toLocaleString("zh-CN"),
-          source: "renewReportForm",
-        });
-      } catch (e) {
-        console.error("保存续单报备到数据库失败：", e);
-      }
 
       // 📱 自动发送到 Telegram（仅第一个群，包含老板名字）
       const telegramRenewReportMsg = `<b>🔄 新的续单报备</b>
@@ -1126,6 +1185,7 @@ client.on("interactionCreate", async (interaction) => {
 <b>⏰ 时长:</b> ${duration}
 <b>💰 金额:</b> RM ${amount}
 <b>📅 时间:</b> ${new Date().toLocaleString("zh-CN")}
+<b>📦 订单ID:</b> ${orderId}
 ━━━━━━━━━━━━━━━━━━`;
       await sendTelegramReport(config.telegramChatId, telegramRenewReportMsg, config.telegramMessageThreadId).catch(() => {});
 
@@ -1249,33 +1309,56 @@ client.on("interactionCreate", async (interaction) => {
         });
 
       const oldEmbed = msg.embeds[0];
-      if (!oldEmbed)
+      if (!oldEmbed) {
+        console.error("❌ [addOrderNumberModal] 原始 embed 不存在");
         return interaction.reply({
           content: "❌ 原始 embed 不存在。",
           ephemeral: true,
         });
+      }
 
       // 【修复】从 Embed footer 中解析 orderId，而不是盲目猜测
       const footerText = oldEmbed.footer?.text || "";
-      const orderIdMatch = footerText.match(/orderId:(\d+)/);
-      const orderId = orderIdMatch ? parseInt(orderIdMatch[1]) : null;
+      console.log(`📝 [addOrderNumberModal] Footer 文本: "${footerText}"`);
+      
+      // 支持两种格式：orderId: 和 ID:（兼容旧版本）
+      let orderIdMatch = footerText.match(/orderId:(\d+)/);
+      let orderId = orderIdMatch ? parseInt(orderIdMatch[1]) : null;
+      
+      // 如果找不到新格式，尝试旧格式 ID: 并为其补充 orderId
+      if (!orderId) {
+        const oldIdMatch = footerText.match(/ID:(\d+)/);
+        orderId = oldIdMatch ? parseInt(oldIdMatch[1]) : null;
+        if (orderId) {
+          console.warn(`⚠️ [addOrderNumberModal] 检测到旧版本 footer 格式，orderId: ${orderId}`);
+        }
+      }
 
       if (!orderId) {
+        console.error(`❌ [addOrderNumberModal] 无法从 footer 中提取 orderId，footer: "${footerText}"`);
+        console.error(`❌ [addOrderNumberModal] 消息ID: ${ctx.messageId}, 频道ID: ${ctx.channelId}`);
         return interaction.reply({
-          content: "❌ 无法从报备记录中提取订单 ID，可能是旧版本记录。",
+          content: "❌ 无法从报备记录中提取订单 ID，可能是旧版本记录。请联系管理员重新报备。",
           ephemeral: true,
         });
       }
+      
+      console.log(`✅ [addOrderNumberModal] 成功提取 orderId: ${orderId}`);
 
-      // 创建新 embed（移除旧单号 & 加入新单号）
+      // 创建新 embed（移除旧单号、单号状态 & 加入新单号和已添加状态）
       const newEmbed = EmbedBuilder.from(oldEmbed);
       const filtered = (oldEmbed.fields || []).filter(
-        (f) => f.name !== "🔢 单号"
+        (f) => f.name !== "🔢 单号" && f.name !== "🔢 单号状态" && f.name !== "🔢 新单号状态"
       );
       newEmbed.setFields(filtered);
       newEmbed.addFields({
         name: "🔢 单号",
         value: orderNumber,
+      });
+      newEmbed.addFields({
+        name: "🔢 单号状态",
+        value: "✅ 已添加",
+        inline: true,
       });
 
       await msg.edit({
@@ -1286,20 +1369,14 @@ client.on("interactionCreate", async (interaction) => {
       // 【修复】使用从footer解析的orderId直接更新数据库
       let updatedOrderInfo = null;
       try {
-        // 【修复问题 18】检查单号是否已存在
-        const existingOrder = await db.queryOrders({ orderNo: orderNumber });
-        if (existingOrder.length > 0) {
-          return await interaction.reply({
-            content: `❌ 单号 "${orderNumber}" 已被使用，请使用不同的单号`,
-            ephemeral: true
-          });
-        }
-        
-        await db.updateOrderNumber(orderId, orderNumber);
-        updatedOrderInfo = await db.getOrderById(orderId);
-        // 【架构改造】不再使用cacheManager，所有数据源都来自SQLite
+        // 【修复】允许重用已存在的单号 - 用户可使用任何单号，不限制唯一性
+        console.log(`📊 [addOrderNumberModal] 正在更新 orderId:${orderId} 的订单号为 ${orderNumber}`);
+        db.updateOrderNumber(orderId, orderNumber);
+        updatedOrderInfo = db.getOrderById(orderId);
+        console.log(`✅ [addOrderNumberModal] 订单号更新成功，updated info:`, updatedOrderInfo);
       } catch (e) {
-        console.error("❌ 更新数据库单号失败：", e.message);
+        console.error("❌ [addOrderNumberModal] 更新数据库单号失败：", e.message);
+        console.error("❌ [addOrderNumberModal] 错误堆栈：", e.stack);
         return await interaction.reply({
           content: `❌ 数据库更新失败: ${e.message}`,
           ephemeral: true,
@@ -2722,6 +2799,20 @@ SELECT id, type, boss, player, assigner, orderType, game, duration, amount, pric
       // if (logChannel) {
       //   await logChannel.send({ embeds: [embed] });
       // }
+
+      // 【新增】自动发送到报备派单频道
+      try {
+        const reportDispatchChannel = guild.channels.cache.get(REPORT_DISPATCH_CHANNEL_ID) ||
+          (await guild.channels.fetch(REPORT_DISPATCH_CHANNEL_ID).catch(() => null));
+        if (reportDispatchChannel && reportDispatchChannel.isTextBased()) {
+          await reportDispatchChannel.send({ embeds: [embed] });
+          console.log(`✅ 派单已发送到频道: ${REPORT_DISPATCH_CHANNEL_ID}`);
+        } else {
+          console.warn(`⚠️ 报备派单频道不存在或非文本频道: ${REPORT_DISPATCH_CHANNEL_ID}`);
+        }
+      } catch (err) {
+        console.error("❌ 发送派单到频道失败：", err.message);
+      }
 
       // 检查channel是否存在（可能已被删除）
       if (interaction.channel) {
