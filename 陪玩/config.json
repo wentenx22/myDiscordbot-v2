@@ -1,0 +1,17 @@
+{
+  "token": "MTQzMzk0NTAwOTY0NzkxNTA4MQ.G0MPDC.ThfKDPlxoI81CiERuP53EIdi9wlpvxfH3oxqwI",
+  "clientId": "1433945009647915081",
+  "guildId": "1433718200692117667",
+  "adminRoleId": "1433888286006312970",
+  "welcomeChannelId": "1433718201690357801",
+  "ticketToolChannelId": "1434021343401218189", 
+  "logChannelId": "1436268020866617494",
+  "reportChannelId": "1436684853297938452",
+  "autoStats": true,
+  "telegramToken": "8213840389:AAE9QdQnB1InkwBZ0C49m36nqGudiVbIl8g",
+  "telegramChatId": "-1003366056090",
+  "telegramMessageThreadId": "21",
+  "googleSheetsId": "1HtVCJEEOl_3-_pQ97heSet0yE041ms3pyojYzAuI7O0",
+  "googleApiKey": "AIzaSyCzqcuIlUGyePaa1bD6Mnv-QEO0f5CX33Q",
+  "csvArchiveChannelId": "1457035667157680431"
+}
