@@ -7,28 +7,6 @@
 // =============================================================
 
 // 加载环境变量
-require('dotenv').config();
-
-// 替换配置文件中的环境变量
-const loadConfig = () => {
-  let config = require('./config.json');
-  const env = process.env;
-  
-  // 替换所有 ${VAR} 格式的环境变量
-  const replaceEnvVars = (obj) => {
-    for (let key in obj) {
-      if (typeof obj[key] === 'string' && obj[key].startsWith('${') && obj[key].endsWith('}')) {
-        const envVarName = obj[key].slice(2, -1);
-        obj[key] = env[envVarName] || obj[key];
-      }
-    }
-    return obj;
-  };
-  
-  return replaceEnvVars(config);
-};
-
-const config = loadConfig();
 
 // ---------------- IMPORTS ----------------
 const {
