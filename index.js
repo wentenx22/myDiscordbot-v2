@@ -6,6 +6,9 @@
 // 其它：继承 v4.2b-Pink 的 UI 与功能（移除关键词自动回复）
 // =============================================================
 
+// ========== 【新增】加载环境变量 ==========
+require('dotenv').config({ path: '.env', override: false }); // 可选，不存在不报错
+
 // ---------------- IMPORTS ----------------
 const {
   Client,
@@ -16,7 +19,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
   ModalBuilder,
-  TextInputBuilder,
+  Text2InputBuilder,
   TextInputStyle,
   SlashCommandBuilder,
   REST,
@@ -44,11 +47,16 @@ try {
   config = JSON.parse(fs.readFileSync("./config.json", "utf8"));
   console.log("✅ [启动] config.json 读取成功");
   
+  // 【新增】从环境变量读取敏感信息（优先级最高）
+  config.token = process.env.DISCORD_TOKEN || config.token;
+  config.clientId = process.env.APPLICATION_ID || config.clientId;
+  console.log("✅ [启动] 敏感信息载入完成 (token & clientId)");
+  
   // 【新增】验证必填字段
   const requiredFields = ['token', 'clientId', 'telegramToken', 'telegramChatId', 'adminRoleId'];
   const missingFields = requiredFields.filter(f => !config[f]);
   if (missingFields.length > 0) {
-    throw new Error(`config.json 缺少必填字段: ${missingFields.join(', ')}`);
+    throw new Error(`config.json 或环境变量缺少必填字段: ${missingFields.join(', ')}`);
   }
   console.log("✅ [启动] config 字段验证成功");
 
